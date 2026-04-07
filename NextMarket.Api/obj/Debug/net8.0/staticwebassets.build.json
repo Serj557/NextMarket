@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "euLC9u81gFhM1n86QrJfxLEuvk7mAU2PuttK2jP6WE0=",
+  "Source": "NextMarket.Api",
+  "BasePath": "_content/NextMarket.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
