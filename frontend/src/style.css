@@ -1,0 +1,218 @@
+:root {
+  --bg: #0b1020;
+  --panel: rgba(255, 255, 255, 0.08);
+  --panel-border: rgba(255, 255, 255, 0.12);
+  --text: rgba(255, 255, 255, 0.82);
+  --text-strong: rgba(255, 255, 255, 0.95);
+  --muted: rgba(255, 255, 255, 0.6);
+  --accent: #7c3aed;
+  --accent-2: #22c55e;
+  --danger: #ef4444;
+  --warn: #f59e0b;
+  --shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  --radius: 16px;
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 16px/145% var(--sans);
+  color: var(--text);
+  background: radial-gradient(1200px 800px at 20% 10%, rgba(124, 58, 237, 0.35), transparent 60%),
+    radial-gradient(900px 600px at 80% 30%, rgba(34, 197, 94, 0.22), transparent 55%),
+    var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.authCard {
+  width: 420px;
+  max-width: 100%;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+}
+
+.authHeader {
+  padding: 18px 18px 8px;
+}
+
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.brandMark {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(34, 197, 94, 1));
+}
+.brandName {
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: 0.2px;
+}
+.brandTagline {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.authTitle {
+  margin: 10px 0 6px;
+  font-size: 22px;
+  color: var(--text-strong);
+}
+.authSubtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.authTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--panel-border);
+  border-bottom: 1px solid var(--panel-border);
+}
+.tab {
+  padding: 12px 12px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+}
+.tab:hover {
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.04);
+}
+.tabActive {
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.authBody {
+  padding: 18px;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text-strong);
+  outline: none;
+}
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.input:focus {
+  border-color: rgba(124, 58, 237, 0.7);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+}
+
+.btn {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(99, 102, 241, 1));
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.alert {
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+.alertError {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+}
+.alertOk {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+}
+.alertWarn {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.hintRow {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.authFooter {
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.inlineCode {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 2px 6px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+}
