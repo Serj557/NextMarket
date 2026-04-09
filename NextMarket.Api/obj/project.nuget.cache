@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "zoC+brHK2Ws=",
+  "dgSpecHash": "jo23wu1GKxg=",
   "success": true,
-  "projectFilePath": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.Api\\NextMarket.Api.csproj",
+  "projectFilePath": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.API\\NextMarket.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\hacky\\.nuget\\packages\\bcrypt.net-next\\4.0.3\\bcrypt.net-next.4.0.3.nupkg.sha512",
     "C:\\Users\\hacky\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",

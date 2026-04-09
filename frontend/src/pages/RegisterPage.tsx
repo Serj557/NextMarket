@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AuthShell } from '../components/AuthShell'
 import { api } from '../lib/api'
+import { saveAuthSession } from '../lib/authSession'
 
 export function RegisterPage() {
+  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -27,18 +29,19 @@ export function RegisterPage() {
     try {
       const res = await api.register({ name: name.trim(), email: email.trim(), password })
       if (!res.ok) {
-        setError(res.error)
+        setError('error' in res ? res.error : 'Ошибка регистрации')
         return
       }
-      localStorage.setItem('nm_token', res.data.token)
-      setSuccess('Аккаунт создан. Токен сохранён в localStorage (nm_token).')
+      saveAuthSession(res.data)
+      setSuccess('Аккаунт создан.')
+      navigate('/')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <AuthShell title="Регистрация" subtitle="Создайте аккаунт, чтобы начать" active="register">
+    <AuthShell title="Регистрация" subtitle="Создайте аккаунт, чтобы начать">
       <form className="form" onSubmit={onSubmit}>
         <label className="field">
           <span className="label">Имя</span>

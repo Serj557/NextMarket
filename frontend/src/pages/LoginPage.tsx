@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AuthShell } from '../components/AuthShell'
 import { api } from '../lib/api'
+import { saveAuthSession } from '../lib/authSession'
 
 export function LoginPage() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -22,18 +24,19 @@ export function LoginPage() {
     try {
       const res = await api.login({ email: email.trim(), password })
       if (!res.ok) {
-        setError(res.error)
+        setError('error' in res ? res.error : 'Ошибка авторизации')
         return
       }
-      localStorage.setItem('nm_token', res.data.token)
-      setSuccess('Успешный вход. Токен сохранён в localStorage (nm_token).')
+      saveAuthSession(res.data)
+      setSuccess('Успешный вход.')
+      navigate('/')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <AuthShell title="Вход" subtitle="Войдите, чтобы покупать и продавать товары" active="login">
+    <AuthShell title="Вход" subtitle="Войдите, чтобы покупать и продавать товары">
       <form className="form" onSubmit={onSubmit}>
         <label className="field">
           <span className="label">Email</span>

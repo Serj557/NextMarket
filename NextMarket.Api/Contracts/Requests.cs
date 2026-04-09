@@ -7,6 +7,10 @@ public record RegisterUserRequest(
     [Required, MinLength(6)] string Password,
     [Required, MaxLength(120)] string Name);
 
+public record LoginUserRequest(
+    [Required, EmailAddress, MaxLength(256)] string Email,
+    [Required, MinLength(6)] string Password);
+
 public record CreateProductRequest(
     [Required] Guid SellerId,
     [Required, MaxLength(200)] string Title,
