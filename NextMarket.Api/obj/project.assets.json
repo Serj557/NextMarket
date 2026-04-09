@@ -2630,11 +2630,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.Api\\NextMarket.Api.csproj",
+      "projectUniqueName": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.API\\NextMarket.Api.csproj",
       "projectName": "NextMarket.Api",
-      "projectPath": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.Api\\NextMarket.Api.csproj",
+      "projectPath": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.API\\NextMarket.Api.csproj",
       "packagesPath": "C:\\Users\\hacky\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.Api\\obj\\",
+      "outputPath": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.API\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\hacky\\AppData\\Roaming\\NuGet\\NuGet.Config"

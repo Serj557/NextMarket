@@ -2,6 +2,8 @@ namespace NextMarket.Api.Contracts;
 
 public record UserResponse(Guid Id, string Email, string Name, DateTime CreatedAt);
 
+public record AuthResponse(string Token, Guid UserId, string Email, string Name);
+
 public record ProductResponse(
     Guid Id,
     Guid SellerId,

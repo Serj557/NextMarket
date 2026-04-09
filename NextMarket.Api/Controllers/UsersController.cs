@@ -11,7 +11,7 @@ namespace NextMarket.Api.Controllers;
 public class UsersController(AppDbContext dbContext) : ControllerBase
 {
     [HttpPost("register")]
-    public async Task<ActionResult<UserResponse>> Register([FromBody] RegisterUserRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterUserRequest request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
         var exists = await dbContext.Users.AnyAsync(x => x.Email == email, cancellationToken);
@@ -30,7 +30,26 @@ public class UsersController(AppDbContext dbContext) : ControllerBase
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return CreatedAtAction(nameof(GetById), new { id = user.Id }, ToResponse(user));
+        return Ok(ToAuthResponse(user));
+    }
+
+    [HttpPost("login")]
+    public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginUserRequest request, CancellationToken cancellationToken)
+    {
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
+        if (user is null)
+        {
+            return Unauthorized("Неверный email или пароль.");
+        }
+
+        var validPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+        if (!validPassword)
+        {
+            return Unauthorized("Неверный email или пароль.");
+        }
+
+        return Ok(ToAuthResponse(user));
     }
 
     [HttpGet]
@@ -58,4 +77,6 @@ public class UsersController(AppDbContext dbContext) : ControllerBase
     }
 
     private static UserResponse ToResponse(User user) => new(user.Id, user.Email, user.Name, user.CreatedAt);
+    private static AuthResponse ToAuthResponse(User user) =>
+        new(Convert.ToBase64String(Guid.NewGuid().ToByteArray()), user.Id, user.Email, user.Name);
 }

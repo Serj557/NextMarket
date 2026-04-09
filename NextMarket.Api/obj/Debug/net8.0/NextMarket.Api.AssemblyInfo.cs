@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("NextMarket.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d8e4128bb2689cbd3ce7838fcec9cd4c3191ad78")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d5496d427b951210fb8e3cbc5c7f44389486fbce")]
 [assembly: System.Reflection.AssemblyProductAttribute("NextMarket.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("NextMarket.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
