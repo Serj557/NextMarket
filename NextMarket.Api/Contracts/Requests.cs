@@ -15,14 +15,14 @@ public record CreateProductRequest(
     [Required] Guid SellerId,
     [Required, MaxLength(200)] string Title,
     string? Description,
-    [Range(typeof(decimal), "0.01", "9999999999")] decimal Price,
+    [Range(0.01, 9999999999)] decimal Price,
     [Range(0, int.MaxValue)] int StockQty);
 
 public record UpdateProductRequest(
     [Required] Guid SellerId,
     [Required, MaxLength(200)] string Title,
     string? Description,
-    [Range(typeof(decimal), "0.01", "9999999999")] decimal Price,
+    [Range(0.01, 9999999999)] decimal Price,
     [Range(0, int.MaxValue)] int StockQty,
     bool IsActive);
 

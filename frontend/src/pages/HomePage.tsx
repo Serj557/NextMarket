@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { clearAuthSession, readCurrentUser } from '../lib/authSession'
 import { readFavorites, toFavoriteProduct, writeFavorites } from '../lib/favorites'
-import { mockProducts, type ProductItem } from '../lib/mockProducts'
+import { productsApi, type ProductResponse } from '../lib/productsApi'
 
 type CategoryItem = {
   title: string
@@ -38,13 +38,39 @@ const categories: CategoryItem[] = [
   { title: 'Здоровье', emoji: '💊' },
 ]
 
+type ProductItem = {
+  id: string
+  title: string
+  price: string
+  place: string
+  badge: string
+}
+
+function extractLocation(description?: string | null) {
+  if (!description) return 'Не указано'
+  const line = description
+    .split('\n')
+    .find((x) => x.trim().toLowerCase().startsWith('расположение:'))
+  return line ? line.replace(/расположение:\s*/i, '').trim() || 'Не указано' : 'Не указано'
+}
+
+function toHomeCard(item: ProductResponse): ProductItem {
+  return {
+    id: item.id,
+    title: item.title,
+    price: `${item.price.toLocaleString('ru-RU')} ₽`,
+    place: extractLocation(item.description),
+    badge: item.averageRating ? `Рейтинг ${item.averageRating.toFixed(1)}` : 'Новое',
+  }
+}
+
 export function HomePage() {
   const location = useLocation()
   const cloudCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false)
   const [currentUser, setCurrentUser] = useState(() => readCurrentUser())
   const [favorites, setFavorites] = useState(() => readFavorites())
-  const allProducts = useMemo(() => [...mockProducts], [])
+  const [allProducts, setAllProducts] = useState<ProductItem[]>([])
 
   function toggleFavorite(item: ProductItem) {
     const favoriteItem = toFavoriteProduct(item)
@@ -60,6 +86,18 @@ export function HomePage() {
     clearAuthSession()
     setCurrentUser(null)
   }
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const res = await productsApi.getAll()
+      if (!res.ok || cancelled) return
+      setAllProducts(res.data.map(toHomeCard))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const canvas = cloudCanvasRef.current
@@ -240,7 +278,9 @@ export function HomePage() {
             <div className="heroSpotlightText">
               <span className="heroEyebrow">не витайте в облаках - покупайте выгодно</span>
               <h1 className="heroHeadline">
-                Не витайте в облаках - <span className="heroHeadlineAccent">покупайте!</span>
+                Не <span className="heroFloatWord">витайте</span> в{' '}
+                <span className="heroCloudWord">облаках</span> -{' '}
+                <span className="heroHeadlineAccent">покупайте!</span>
               </h1>
               <p className="heroLead">
                 Находите нужное быстрее, покупайте безопаснее.
@@ -249,15 +289,15 @@ export function HomePage() {
             <div className="heroMetrics">
               <article className="metricCard">
                 <span className="metricLabel">Активных объявлений</span>
-                <strong className="metricValue">24 000+</strong>
+                <strong className="metricValue">{allProducts.length.toLocaleString('ru-RU')}+</strong>
               </article>
             </div>
           </section>
 
           <section className="createCtaRow" aria-label="Размещение объявления">
-            <button className="createAdHeroBtn" type="button">
+            <Link className="createAdHeroBtn createAdHeroLink" to="/my-products?mode=create">
               Разместить объявление
-            </button>
+            </Link>
           </section>
 
           <section className="productsBlock">

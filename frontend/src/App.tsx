@@ -5,6 +5,7 @@ import { FavoritesPage } from './pages/FavoritesPage'
 import { HelpPage } from './pages/HelpPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
+import { MyProductsPage } from './pages/MyProductsPage'
 import { ProductPage } from './pages/ProductPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RegisterPage } from './pages/RegisterPage'
@@ -29,6 +30,7 @@ export function App() {
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/products/:productId" element={<ProductPage />} />
+        <Route path="/my-products" element={<MyProductsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
