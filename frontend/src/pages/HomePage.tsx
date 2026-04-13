@@ -1,50 +1,63 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { clearAuthSession, readCurrentUser } from '../lib/authSession'
+import { marketplaceCategories } from '../lib/categories'
 import { readFavorites, toFavoriteProduct, writeFavorites } from '../lib/favorites'
-import { mockProducts, type ProductItem } from '../lib/mockProducts'
+import { getProductImage } from '../lib/productImages'
+import { productsApi, type ProductResponse } from '../lib/productsApi'
 
 type CategoryItem = {
   title: string
-  emoji: string
 }
 
-const categories: CategoryItem[] = [
-  { title: 'Авто', emoji: '🚗' },
-  { title: 'Недвижимость', emoji: '🏢' },
-  { title: 'Работа', emoji: '💼' },
-  { title: 'Одежда', emoji: '👕' },
-  { title: 'Хобби', emoji: '🎯' },
-  { title: 'Животные', emoji: '🐶' },
-  { title: 'Услуги', emoji: '🧰' },
-  { title: 'Электроника', emoji: '📱' },
-  { title: 'Красота', emoji: '💄' },
-  { title: 'Товары для дома', emoji: '🏠' },
-  { title: 'Детские товары', emoji: '🧸' },
-  { title: 'Спорт и отдых', emoji: '⚽' },
-  { title: 'Книги и учеба', emoji: '📚' },
-  { title: 'Музыка и инструменты', emoji: '🎸' },
-  { title: 'Строительство', emoji: '🛠️' },
-  { title: 'Сад и огород', emoji: '🌿' },
-  { title: 'Техника для кухни', emoji: '🍳' },
-  { title: 'Смартфоны', emoji: '📲' },
-  { title: 'Компьютеры', emoji: '💻' },
-  { title: 'Игры и приставки', emoji: '🎮' },
-  { title: 'Часы и украшения', emoji: '⌚' },
-  { title: 'Обувь', emoji: '👟' },
-  { title: 'Сумки', emoji: '👜' },
-  { title: 'Туризм', emoji: '🏕️' },
-  { title: 'Фото и видео', emoji: '📷' },
-  { title: 'Здоровье', emoji: '💊' },
-]
+const categories: CategoryItem[] = marketplaceCategories.map((title) => ({ title }))
+
+type ProductItem = {
+  id: string
+  title: string
+  price: string
+  place: string
+  badge: string
+  imageUrl: string | null
+  category: string
+}
+
+function extractLocation(description?: string | null) {
+  if (!description) return 'Не указано'
+  const line = description
+    .split('\n')
+    .find((x) => x.trim().toLowerCase().startsWith('расположение:'))
+  return line ? line.replace(/расположение:\s*/i, '').trim() || 'Не указано' : 'Не указано'
+}
+
+function toHomeCard(item: ProductResponse): ProductItem {
+  const categoryLine = item.description
+    ?.split('\n')
+    .find((x) => x.trim().toLowerCase().startsWith('категория:'))
+  const category = categoryLine?.replace(/категория:\s*/i, '').trim() || 'Без категории'
+
+  return {
+    id: item.id,
+    title: item.title,
+    price: `${item.price.toLocaleString('ru-RU')} ₽`,
+    place: extractLocation(item.description),
+    badge: item.averageRating ? `Рейтинг ${item.averageRating.toFixed(1)}` : 'Новое',
+    imageUrl: getProductImage(item.id),
+    category,
+  }
+}
 
 export function HomePage() {
   const location = useLocation()
   const cloudCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchText, setSearchText] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [currentUser, setCurrentUser] = useState(() => readCurrentUser())
   const [favorites, setFavorites] = useState(() => readFavorites())
-  const allProducts = useMemo(() => [...mockProducts], [])
+  const [allProducts, setAllProducts] = useState<ProductItem[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<ProductItem[]>([])
 
   function toggleFavorite(item: ProductItem) {
     const favoriteItem = toFavoriteProduct(item)
@@ -60,6 +73,40 @@ export function HomePage() {
     clearAuthSession()
     setCurrentUser(null)
   }
+
+  function onSearchSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSearchText(searchInput)
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const res = await productsApi.getAll()
+      if (!res.ok || cancelled) return
+      const next = res.data.map(toHomeCard)
+      setAllProducts(next)
+      setFilteredProducts(next)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const query = searchText.trim().toLowerCase()
+    const next = allProducts.filter((item) => {
+      const categoryOk = selectedCategory ? item.category === selectedCategory : true
+      if (!query) return categoryOk
+      return (
+        categoryOk &&
+        (item.title.toLowerCase().includes(query) ||
+          item.place.toLowerCase().includes(query) ||
+          item.category.toLowerCase().includes(query))
+      )
+    })
+    setFilteredProducts(next)
+  }, [allProducts, searchText, selectedCategory])
 
   useEffect(() => {
     const canvas = cloudCanvasRef.current
@@ -204,7 +251,7 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="searchRow">
+        <form className="searchRow" onSubmit={onSearchSubmit}>
           <button
             className={`catalogBtn ${showCategoriesMenu ? 'catalogBtnActive' : ''}`}
             type="button"
@@ -217,16 +264,32 @@ export function HomePage() {
             </span>
             <span>Категории</span>
           </button>
-          <input className="searchInput" placeholder="Поиск по объявлениям" />
-          <button className="searchBtn" type="button">
+          <input
+            className="searchInput"
+            placeholder="Поиск по объявлениям"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <button className="searchBtn" type="submit">
             Найти
           </button>
-        </div>
+        </form>
         {showCategoriesMenu ? (
           <section id="categories-menu" className="searchCategoriesMenu" aria-label="Категории">
+            <button
+              className={`searchCategoryChip ${selectedCategory === '' ? 'searchCategoryChipActive' : ''}`}
+              type="button"
+              onClick={() => setSelectedCategory('')}
+            >
+              <span>Все категории</span>
+            </button>
             {categories.map((item) => (
-              <button key={item.title} className="searchCategoryChip" type="button">
-                <span className="categoryEmoji">{item.emoji}</span>
+              <button
+                key={item.title}
+                className={`searchCategoryChip ${selectedCategory === item.title ? 'searchCategoryChipActive' : ''}`}
+                type="button"
+                onClick={() => setSelectedCategory(item.title)}
+              >
                 <span>{item.title}</span>
               </button>
             ))}
@@ -240,7 +303,9 @@ export function HomePage() {
             <div className="heroSpotlightText">
               <span className="heroEyebrow">не витайте в облаках - покупайте выгодно</span>
               <h1 className="heroHeadline">
-                Не витайте в облаках - <span className="heroHeadlineAccent">покупайте!</span>
+                Не <span className="heroFloatWord">витайте</span> в{' '}
+                <span className="heroCloudWord">облаках</span> -{' '}
+                <span className="heroHeadlineAccent">покупайте!</span>
               </h1>
               <p className="heroLead">
                 Находите нужное быстрее, покупайте безопаснее.
@@ -249,21 +314,21 @@ export function HomePage() {
             <div className="heroMetrics">
               <article className="metricCard">
                 <span className="metricLabel">Активных объявлений</span>
-                <strong className="metricValue">24 000+</strong>
+                <strong className="metricValue">{filteredProducts.length.toLocaleString('ru-RU')}+</strong>
               </article>
             </div>
           </section>
 
           <section className="createCtaRow" aria-label="Размещение объявления">
-            <button className="createAdHeroBtn" type="button">
+            <Link className="createAdHeroBtn createAdHeroLink" to="/my-products?mode=create">
               Разместить объявление
-            </button>
+            </Link>
           </section>
 
           <section className="productsBlock">
             <h2 className="homeSectionTitle">Рекомендации для вас</h2>
             <div className="productGrid">
-              {allProducts.map((item, index) => {
+              {filteredProducts.map((item, index) => {
                 const favoriteId = toFavoriteProduct(item).id
                 const isFavorite = favorites.some((fav) => fav.id === favoriteId)
                 return (
@@ -275,7 +340,11 @@ export function HomePage() {
                   >
                     <div className="productMedia">
                       <span className="productBadge">{item.badge}</span>
-                      <div className="productImage" />
+                      {item.imageUrl ? (
+                        <img className="productImage" src={item.imageUrl} alt={item.title} />
+                      ) : (
+                        <div className="productImage" />
+                      )}
                     </div>
                     <div className="offerInfo">
                       <span className="offerBtnTitle">{item.title}</span>
@@ -297,6 +366,9 @@ export function HomePage() {
                 )
               })}
             </div>
+            {filteredProducts.length === 0 ? (
+              <p className="homeCardText">Ничего не найдено. Попробуйте другой запрос или категорию.</p>
+            ) : null}
           </section>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { hasAuthSession, readCurrentUser } from '../lib/authSession'
 
 export function ProfilePage() {
@@ -18,15 +18,5 @@ export function ProfilePage() {
     )
   }
 
-  return (
-    <main className="marketHome">
-      <section className="homeBlock">
-        <h1 className="homeSectionTitle">Профиль</h1>
-        <p className="homeCardText">Страница профиля в разработке. Завтра продолжим.</p>
-        <p className="homeCardText">
-          Пользователь: <strong>{user.name}</strong> ({user.email})
-        </p>
-      </section>
-    </main>
-  )
+  return <Navigate to="/my-products?section=settings" replace />
 }

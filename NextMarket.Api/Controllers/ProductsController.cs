@@ -129,9 +129,15 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
     [HttpGet("my")]
     public async Task<ActionResult<IReadOnlyCollection<ProductResponse>>> GetMyProducts([FromQuery] Guid sellerId, CancellationToken cancellationToken)
     {
+        var sellerExists = await dbContext.Users.AnyAsync(x => x.Id == sellerId, cancellationToken);
+        if (!sellerExists)
+        {
+            return NotFound("Пользователь не найден.");
+        }
+
         var products = await dbContext.Products
             .AsNoTracking()
-            .Where(x => x.SellerId == sellerId)
+            .Where(x => x.SellerId == sellerId && x.IsActive)
             .Select(x => new
             {
                 Product = x,
@@ -141,6 +147,32 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             .ToListAsync(cancellationToken);
 
         return Ok(products.Select(x => ToResponse(x.Product, x.AverageRating)).ToList());
+    }
+
+    [HttpGet("my/{id:guid}")]
+    public async Task<ActionResult<ProductResponse>> GetMyProductById(Guid id, [FromQuery] Guid sellerId, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.Products
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                Product = x,
+                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound("Товар не найден.");
+        }
+
+        if (item.Product.SellerId != sellerId)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "Нельзя просматривать детали чужого товара.");
+        }
+
+        return Ok(ToResponse(item.Product, item.AverageRating));
     }
 
     private async Task<ProductResponse> BuildProductResponse(Product product, CancellationToken cancellationToken)
