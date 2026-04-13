@@ -1,15 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { parsePrice, readCart, writeCart } from '../lib/cart'
+import { parsePrice, readCart, removeFromCart } from '../lib/cart'
 
 export function CartPage() {
   const [items, setItems] = useState(() => readCart())
 
   function removeItem(id: string) {
-    const next = items.filter((item) => item.id !== id)
+    const next = removeFromCart(id)
     setItems(next)
-    writeCart(next)
   }
+
+  useEffect(() => {
+    setItems(readCart())
+  }, [])
 
   const totalCount = useMemo(
     () => items.length,
@@ -41,7 +44,11 @@ export function CartPage() {
                 {items.map((item) => {
                   return (
                     <article key={item.id} className="cartItemCard">
-                      <div className="cartItemPreview" />
+                      {item.imageUrl ? (
+                        <img className="cartItemPreview" src={item.imageUrl} alt={item.title} />
+                      ) : (
+                        <div className="cartItemPreview" />
+                      )}
                       <div className="cartItemMain">
                         <h2 className="cartItemTitle">{item.title}</h2>
                         <p className="cartItemMeta">{item.place}</p>

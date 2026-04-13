@@ -137,7 +137,7 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
 
         var products = await dbContext.Products
             .AsNoTracking()
-            .Where(x => x.SellerId == sellerId)
+            .Where(x => x.SellerId == sellerId && x.IsActive)
             .Select(x => new
             {
                 Product = x,

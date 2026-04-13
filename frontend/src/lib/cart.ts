@@ -4,6 +4,7 @@ export type CartItem = {
   price: string
   place: string
   quantity: number
+  imageUrl?: string
 }
 
 const CART_KEY = 'nm_cart'
@@ -34,6 +35,13 @@ export function addToCart(item: Omit<CartItem, 'quantity'>) {
     return
   }
   writeCart([...current, { ...item, quantity: 1 }])
+}
+
+export function removeFromCart(id: string) {
+  const current = readCart()
+  const next = current.filter((item) => item.id !== id)
+  writeCart(next)
+  return next
 }
 
 export function parsePrice(price: string) {

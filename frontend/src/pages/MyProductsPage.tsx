@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { clearAuthSession, readCurrentUser } from '../lib/authSession'
-import { readCart } from '../lib/cart'
-import { readFavorites } from '../lib/favorites'
+import { readCart, removeFromCart } from '../lib/cart'
+import { marketplaceCategories } from '../lib/categories'
+import { readFavorites, writeFavorites } from '../lib/favorites'
+import { filesToDataUrls, getProductImage, getProductImages, removeProductImage, saveProductImages } from '../lib/productImages'
 import {
   productsApi,
   type CreateProductRequest,
@@ -10,16 +12,7 @@ import {
   type UpdateProductRequest,
 } from '../lib/productsApi'
 
-const adCategories: string[] = [
-  'Авто',
-  'Недвижимость',
-  'Работа',
-  'Одежда',
-  'Хобби',
-  'Животные',
-  'Услуги',
-  'Электроника',
-]
+const adCategories: string[] = [...marketplaceCategories]
 
 type CabinetSection = 'my-products' | 'favorites' | 'cart' | 'settings'
 
@@ -40,11 +33,11 @@ export function MyProductsPage() {
   const [condition, setCondition] = useState<'used' | 'new'>('used')
   const [saleLocation, setSaleLocation] = useState('')
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [stockQty, setStockQty] = useState('1')
-  const [favoriteCount, setFavoriteCount] = useState(0)
-  const [cartCount, setCartCount] = useState(0)
+  const [sectionVersion, setSectionVersion] = useState(0)
 
   const isLoggedIn = Boolean(user?.userId)
 
@@ -63,7 +56,7 @@ export function MyProductsPage() {
       setLoading(false)
       return
     }
-    setItems(res.data)
+    setItems(res.data.filter((item) => item.isActive))
     setLoading(false)
   }
 
@@ -72,11 +65,6 @@ export function MyProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.userId])
 
-  useEffect(() => {
-    setFavoriteCount(readFavorites().length)
-    setCartCount(readCart().length)
-  }, [selectedSection])
-
   function resetForm() {
     setEditingId(null)
     setTitle('')
@@ -84,6 +72,7 @@ export function MyProductsPage() {
     setCondition('used')
     setSaleLocation('')
     setPhotoPreviews([])
+    setPhotoFiles([])
     setDescription('')
     setPrice('')
     setStockQty('1')
@@ -93,12 +82,15 @@ export function MyProductsPage() {
     const files = e.target.files
     if (!files?.length) {
       setPhotoPreviews([])
+      setPhotoFiles([])
       return
     }
-    const previews = Array.from(files)
+    const selected = Array.from(files).slice(0, 6)
+    const previews = selected
       .slice(0, 6)
       .map((file) => URL.createObjectURL(file))
     setPhotoPreviews(previews)
+    setPhotoFiles(selected)
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -143,6 +135,10 @@ export function MyProductsPage() {
       const payload: UpdateProductRequest = { ...payloadBase, isActive: true }
       const res = await productsApi.update(editingId, payload)
       if (!res.ok) return setError('error' in res ? res.error : 'Не удалось обновить объявление')
+      if (photoFiles.length > 0) {
+        const imageDataUrls = await filesToDataUrls(photoFiles)
+        saveProductImages(editingId, imageDataUrls)
+      }
       resetForm()
       await loadMyProducts()
       return
@@ -151,6 +147,10 @@ export function MyProductsPage() {
       const res = await productsApi.create(payload)
       if (!res.ok) return setError('error' in res ? res.error : 'Не удалось создать объявление')
       if (res.ok) {
+        if (photoFiles.length > 0) {
+          const imageDataUrls = await filesToDataUrls(photoFiles)
+          saveProductImages(res.data.id, imageDataUrls)
+        }
         resetForm()
         navigate(`/products/${res.data.id}`)
         return
@@ -164,7 +164,8 @@ export function MyProductsPage() {
     setCategory('')
     setCondition('used')
     setSaleLocation('')
-    setPhotoPreviews([])
+    setPhotoPreviews(getProductImages(item.id))
+    setPhotoFiles([])
     setDescription(item.description ?? '')
     setPrice(String(item.price))
     setStockQty(String(item.stockQty))
@@ -174,6 +175,8 @@ export function MyProductsPage() {
     if (!user) return
     const res = await productsApi.remove(id, user.userId)
     if (!res.ok) return setError('error' in res ? res.error : 'Не удалось удалить объявление')
+    removeProductImage(id)
+    setItems((prev) => prev.filter((item) => item.id !== id))
     await loadMyProducts()
   }
 
@@ -182,7 +185,8 @@ export function MyProductsPage() {
     return 'Добавление объявления'
   }, [editingId])
 
-  const draftCount = useMemo(() => items.filter((x) => !x.isActive).length, [items])
+  const favoriteItems = useMemo(() => readFavorites(), [sectionVersion, selectedSection])
+  const cartItems = useMemo(() => readCart(), [sectionVersion, selectedSection])
 
   const headerBySection = useMemo(() => {
     if (selectedSection === 'favorites') {
@@ -209,6 +213,12 @@ export function MyProductsPage() {
       return
     }
     setSearchParams({ section })
+  }
+
+  function removeFavoriteById(id: string) {
+    const next = readFavorites().filter((item) => item.id !== id)
+    writeFavorites(next)
+    setSectionVersion((x) => x + 1)
   }
 
   if (!isLoggedIn) {
@@ -306,7 +316,6 @@ export function MyProductsPage() {
             {isMyProductsSection && !createMode ? (
               <div className="myAdsTabs">
                 <span className="myAdsTab myAdsTabActive">Активные {items.length}</span>
-                <span className="myAdsTab">Черновики {draftCount}</span>
               </div>
             ) : null}
           </header>
@@ -442,13 +451,16 @@ export function MyProductsPage() {
             <div className="myProductsList myAdsList">
               {items.map((item) => (
                 <article key={item.id} className="myProductCard myAdsItemCard">
-                  <div className="myAdsItemPreview" />
+                  {getProductImage(item.id) ? (
+                    <img className="myAdsItemPreview" src={getProductImage(item.id) ?? ''} alt={item.title} />
+                  ) : (
+                    <div className="myAdsItemPreview" />
+                  )}
                   <div className="myAdsItemMain">
                     <h3 className="myProductTitle">{item.title}</h3>
                     <p className="myProductMeta">
                       {item.price.toLocaleString('ru-RU')} ₽ · Остаток: {item.stockQty}
                     </p>
-                    {item.description ? <p className="myProductDesc">{item.description}</p> : null}
                     <div className="myProductActions">
                       <button className="menuGhostBtn" type="button" onClick={() => startEdit(item)}>
                         Редактировать
@@ -468,35 +480,74 @@ export function MyProductsPage() {
 
           {selectedSection === 'favorites' ? (
             <div className="myProductsList myAdsList">
-              <article className="myProductCard">
-                <div>
-                  <h3 className="myProductTitle">Избранные товары</h3>
-                  <p className="myProductMeta">Сохранено товаров: {favoriteCount}</p>
-                  <p className="myProductDesc">Список избранного открывается в отдельном разделе каталога.</p>
-                </div>
-                <div className="myProductActions">
-                  <Link className="menuGhostBtn" to="/favorites">
-                    Перейти в избранное
-                  </Link>
-                </div>
-              </article>
+              {favoriteItems.length === 0 ? (
+                <article className="myProductCard">
+                  <div>
+                    <h3 className="myProductTitle">Избранное пусто</h3>
+                    <p className="myProductDesc">Добавляйте товары в избранное, чтобы они отображались здесь.</p>
+                  </div>
+                </article>
+              ) : (
+                favoriteItems.map((item) => (
+                  <article key={item.id} className="myProductCard myAdsItemCard">
+                    <div className="myAdsItemPreview" />
+                    <div className="myAdsItemMain">
+                      <h3 className="myProductTitle">{item.title}</h3>
+                      <p className="myProductMeta">{item.price} · {item.place}</p>
+                      <div className="myProductActions">
+                        <button className="logoutBtn menuGhostBtn" type="button" onClick={() => removeFavoriteById(item.id)}>
+                          Удалить
+                        </button>
+                        <Link className="menuGhostBtn" to="/">
+                          Открыть каталог
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           ) : null}
 
           {selectedSection === 'cart' ? (
             <div className="myProductsList myAdsList">
-              <article className="myProductCard">
-                <div>
-                  <h3 className="myProductTitle">Корзина</h3>
-                  <p className="myProductMeta">Товаров в корзине: {cartCount}</p>
-                  <p className="myProductDesc">Проверьте список и оформите заказ в отдельной корзине.</p>
-                </div>
-                <div className="myProductActions">
-                  <Link className="menuGhostBtn" to="/cart">
-                    Перейти в корзину
-                  </Link>
-                </div>
-              </article>
+              {cartItems.length === 0 ? (
+                <article className="myProductCard">
+                  <div>
+                    <h3 className="myProductTitle">Корзина пуста</h3>
+                    <p className="myProductDesc">Добавьте товары из объявлений, чтобы оформить заказ.</p>
+                  </div>
+                </article>
+              ) : (
+                cartItems.map((item) => (
+                  <article key={item.id} className="myProductCard myAdsItemCard">
+                    {item.imageUrl ? (
+                      <img className="myAdsItemPreview" src={item.imageUrl} alt={item.title} />
+                    ) : (
+                      <div className="myAdsItemPreview" />
+                    )}
+                    <div className="myAdsItemMain">
+                      <h3 className="myProductTitle">{item.title}</h3>
+                      <p className="myProductMeta">{item.price} · {item.place}</p>
+                      <div className="myProductActions">
+                        <button
+                          className="logoutBtn menuGhostBtn"
+                          type="button"
+                          onClick={() => {
+                            removeFromCart(item.id)
+                            setSectionVersion((x) => x + 1)
+                          }}
+                        >
+                          Удалить
+                        </button>
+                        <Link className="menuGhostBtn" to="/cart">
+                          Детали корзины
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           ) : null}
 

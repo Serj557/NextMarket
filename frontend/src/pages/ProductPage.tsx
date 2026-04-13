@@ -1,10 +1,43 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { addToCart } from '../lib/cart'
+import { getProductImage, getProductImages } from '../lib/productImages'
 import { productsApi, type ProductResponse } from '../lib/productsApi'
 
 type Props = {
   modal?: boolean
+}
+
+function parseDescription(description?: string | null) {
+  if (!description) {
+    return {
+      category: 'Не указана',
+      condition: 'Не указано',
+      location: 'Не указано',
+      text: 'Описание пока не заполнено.',
+    }
+  }
+
+  const lines = description.split('\n').map((x) => x.trim())
+  const categoryLine = lines.find((x) => x.toLowerCase().startsWith('категория:'))
+  const conditionLine = lines.find((x) => x.toLowerCase().startsWith('состояние:'))
+  const locationLine = lines.find((x) => x.toLowerCase().startsWith('расположение:'))
+  const text = lines
+    .filter(
+      (x) =>
+        x &&
+        !x.toLowerCase().startsWith('категория:') &&
+        !x.toLowerCase().startsWith('состояние:') &&
+        !x.toLowerCase().startsWith('расположение:'),
+    )
+    .join('\n')
+
+  return {
+    category: categoryLine?.replace(/категория:\s*/i, '').trim() || 'Не указана',
+    condition: conditionLine?.replace(/состояние:\s*/i, '').trim() || 'Не указано',
+    location: locationLine?.replace(/расположение:\s*/i, '').trim() || 'Не указано',
+    text: text || 'Описание пока не заполнено.',
+  }
 }
 
 export function ProductPage({ modal = false }: Props) {
@@ -13,23 +46,12 @@ export function ProductPage({ modal = false }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [product, setProduct] = useState<ProductResponse | null>(null)
   const [similarItems, setSimilarItems] = useState<ProductResponse[]>([])
+  const productImages = useMemo(() => (product ? getProductImages(product.id) : []), [product])
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const imageUrl = productImages[activeImageIndex] ?? getProductImage(product?.id ?? '')
 
-  const locationText = useMemo(() => {
-    if (!product?.description) return 'Не указано'
-    const line = product.description
-      .split('\n')
-      .find((x) => x.trim().toLowerCase().startsWith('расположение:'))
-    return line ? line.replace(/расположение:\s*/i, '').trim() || 'Не указано' : 'Не указано'
-  }, [product])
-
-  const detailsText = useMemo(() => {
-    if (!product?.description) return 'Описание пока не заполнено.'
-    return product.description
-      .split('\n')
-      .filter((x) => !x.trim().toLowerCase().startsWith('расположение:'))
-      .join('\n')
-      .trim()
-  }, [product])
+  const parsedDetails = useMemo(() => parseDescription(product?.description), [product?.description])
+  const locationText = parsedDetails.location
 
   useEffect(() => {
     let cancelled = false
@@ -51,6 +73,10 @@ export function ProductPage({ modal = false }: Props) {
   }, [productId])
 
   useEffect(() => {
+    setActiveImageIndex(0)
+  }, [productId, productImages.length])
+
+  useEffect(() => {
     if (!modal) return
     document.body.classList.add('product-modal-open')
     return () => {
@@ -65,6 +91,7 @@ export function ProductPage({ modal = false }: Props) {
       title: product.title,
       price: `${product.price.toLocaleString('ru-RU')} ₽`,
       place: locationText,
+      imageUrl: imageUrl ?? undefined,
     })
     navigate('/cart')
   }
@@ -121,10 +148,46 @@ export function ProductPage({ modal = false }: Props) {
 
         <div className="productLayout">
           <div className="productGallery">
-            <div className="productHeroImage" />
+            {imageUrl ? (
+              <img className="productHeroImage" src={imageUrl} alt={product.title} />
+            ) : (
+              <div className="productHeroImage" />
+            )}
+            {productImages.length > 1 ? (
+              <div className="productThumbRow" aria-label="Галерея фото">
+                {productImages.map((img, index) => (
+                  <button
+                    key={`${img}-${index}`}
+                    className={`productThumbBtn ${activeImageIndex === index ? 'productThumbBtnActive' : ''}`}
+                    type="button"
+                    onClick={() => setActiveImageIndex(index)}
+                    aria-label={`Фото ${index + 1}`}
+                  >
+                    <img className="productThumbImage" src={img} alt="" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <article className="productDetailsCard productDetailsInline">
               <h2 className="productSectionTitle">Подробности</h2>
-              <p className="productFullDescription">{detailsText}</p>
+              <div className="productDetailsParams">
+                <p className="productDetailLine">
+                  <span>Категория</span>
+                  <strong>{parsedDetails.category}</strong>
+                </p>
+                <p className="productDetailLine">
+                  <span>Состояние</span>
+                  <strong>{parsedDetails.condition}</strong>
+                </p>
+                <p className="productDetailLine">
+                  <span>Расположение</span>
+                  <strong>{parsedDetails.location}</strong>
+                </p>
+              </div>
+              <div className="productDescriptionBlock">
+                <h3 className="productDescriptionTitle">Описание</h3>
+                <p className="productFullDescription">{parsedDetails.text}</p>
+              </div>
             </article>
           </div>
 
