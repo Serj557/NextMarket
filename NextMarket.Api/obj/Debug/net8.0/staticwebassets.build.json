@@ -1,11 +1,1 @@
-{
-  "Version": 1,
-  "Hash": "euLC9u81gFhM1n86QrJfxLEuvk7mAU2PuttK2jP6WE0=",
-  "Source": "NextMarket.Api",
-  "BasePath": "_content/NextMarket.Api",
-  "Mode": "Default",
-  "ManifestType": "Build",
-  "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
-  "Assets": []
-}
+{"Version":1,"Hash":"EkR1yeVMblR4di1efPSePz95qUi/V4rEUg0IQxYoqho=","Source":"NextMarket.Api","BasePath":"_content/NextMarket.Api","Mode":"Default","ManifestType":"Build","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[],"Assets":[],"Endpoints":[]}

@@ -2625,24 +2625,31 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\hacky\\.nuget\\packages\\": {}
+    "C:\\Users\\Sergey\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.API\\NextMarket.Api.csproj",
+      "projectUniqueName": "C:\\Users\\Sergey\\Desktop\\NextMarket\\NextMarket.Api\\NextMarket.Api.csproj",
       "projectName": "NextMarket.Api",
-      "projectPath": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.API\\NextMarket.Api.csproj",
-      "packagesPath": "C:\\Users\\hacky\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\hacky\\Documents\\NextMarket\\NextMarket.API\\obj\\",
+      "projectPath": "C:\\Users\\Sergey\\Desktop\\NextMarket\\NextMarket.Api\\NextMarket.Api.csproj",
+      "packagesPath": "C:\\Users\\Sergey\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\Sergey\\Desktop\\NextMarket\\NextMarket.Api\\obj\\",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      ],
       "configFilePaths": [
-        "C:\\Users\\hacky\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\Sergey\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
       ],
       "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -2660,7 +2667,8 @@
         "enableAudit": "true",
         "auditLevel": "low",
         "auditMode": "direct"
-      }
+      },
+      "SdkAnalysisLevel": "9.0.300"
     },
     "frameworks": {
       "net8.0": {
@@ -2708,7 +2716,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.416/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
