@@ -45,7 +45,7 @@ a {
   text-decoration: none;
 }
 a:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .page {
@@ -198,6 +198,51 @@ a:hover {
   background: #fffbeb;
   border-color: #f9d68a;
   color: #92400e;
+}
+
+.appToast {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  z-index: 1200;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  animation: toast-in 0.18s ease-out;
+}
+
+.appToast a {
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+.appToastSuccess {
+  background: #ecfdf3;
+  border-color: #9ee0bb;
+  color: #166534;
+}
+
+.appToastError {
+  background: #fff1f2;
+  border-color: #f8b4c0;
+  color: #9f1239;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .hintRow {
@@ -883,6 +928,299 @@ a {
   gap: 8px;
 }
 
+.myAdsCheckboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+}
+
+.myAdsCheckboxLabelInline {
+  width: 22px;
+  height: 22px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 0;
+}
+
+.myAdsCheckboxLabelInline input {
+  width: 14px;
+  height: 14px;
+}
+
+.myAdsQtyControl {
+  display: inline-grid;
+  gap: 4px;
+}
+
+.myAdsQtyControl > span {
+  font-size: 12px;
+  color: #667085;
+}
+
+.myAdsQtyControl .input {
+  min-height: 36px;
+  width: 92px;
+}
+
+.myAdsCartItemCard {
+  grid-template-columns: 42px 126px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.myAdsCartControls {
+  margin-top: 0;
+  justify-content: flex-end;
+  align-items: end;
+  min-width: 156px;
+  display: grid;
+  gap: 8px;
+}
+
+.myAdsCartControls .menuGhostBtn {
+  width: 100%;
+}
+
+.myAdsItemMain .myProductMeta {
+  margin-top: 6px;
+}
+
+.wbCartLayout {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 10px;
+}
+
+.wbCartMain {
+  display: grid;
+  gap: 14px;
+}
+
+.wbCartBlock {
+  border: 1px solid #edf0f4;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+}
+
+.wbCartBlockHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.wbCartBlockTitle {
+  margin: 0;
+  font-size: clamp(15px, 1.2vw, 18px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.wbCartItems {
+  display: grid;
+  gap: 0;
+}
+
+.wbCartItemRow {
+  display: grid;
+  grid-template-columns: 22px 92px minmax(180px, 1fr) 116px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid #edf1f6;
+  border-radius: 0;
+  padding: 10px 2px;
+}
+
+.wbCartItemRow:last-child {
+  border-bottom: 0;
+}
+
+.wbCartItemRowMuted {
+  opacity: 0.56;
+  background: #f8fafc;
+}
+
+.wbCartItemRowMuted .myAdsItemPreview.wbCartPreview {
+  filter: grayscale(1);
+}
+
+.myAdsItemPreview.wbCartPreview {
+  width: 78px;
+  height: 62px;
+  min-width: 78px;
+  border-radius: 8px;
+  aspect-ratio: auto;
+}
+
+.wbCartInfo {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  align-content: start;
+  padding-left: 2px;
+}
+
+.wbCartInfo .myProductTitle {
+  font-size: 20px;
+  font-size: clamp(14px, 1vw, 17px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.wbCartInfo .myProductMeta {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: #475467;
+}
+
+.wbCartRemoveBtn {
+  margin-top: 6px;
+  width: fit-content;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.wbCartQty {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  align-content: start;
+  min-width: 116px;
+}
+
+.wbQtyLabel {
+  font-size: 12px;
+  color: #9aa3b2;
+}
+
+.wbQtyStepper {
+  height: 32px;
+  min-width: 96px;
+  border: 1px solid #e7ebf2;
+  border-radius: 10px;
+  background: #fff;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.wbQtyBtn {
+  height: 100%;
+  border: 0;
+  background: #f9fafb;
+  color: #4b5563;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wbQtyBtn:disabled {
+  color: #c2c8d4;
+  cursor: not-allowed;
+}
+
+.wbQtyValue {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.wbCartLinePrice {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.wbCartSummary {
+  border: 1px solid #eef2f6;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+  height: fit-content;
+  position: sticky;
+  top: 14px;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.05);
+}
+
+.wbCartSummaryTitle {
+  margin: 0;
+  font-size: clamp(18px, 1.4vw, 24px);
+  line-height: 1.1;
+  color: #111827;
+}
+
+.wbCartSummaryMeta {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #667085;
+}
+
+.wbCartSummaryTotal {
+  margin-top: 6px;
+  color: #111827;
+  font-size: clamp(24px, 1.9vw, 30px);
+  line-height: 1;
+  font-weight: 800;
+}
+
+.wbCartOrderBtn {
+  width: 100%;
+  margin-top: 10px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #a855f7, #9333ea);
+  border-color: #9333ea;
+}
+
+.wbCartQty .myAdsQtyControl .input {
+  width: 70px;
+  min-height: 32px;
+  padding: 5px 8px;
+  font-size: 14px;
+}
+
+.wbCartPageHeader {
+  margin-bottom: 4px;
+}
+
+.wbCartPageTitle {
+  font-size: clamp(24px, 2vw, 34px);
+  line-height: 1.1;
+}
+
+.wbCartPageSubtitle {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+@media (max-width: 1180px) {
+  .wbCartLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .wbCartSummary {
+    position: static;
+  }
+}
+
 .myProductsForm .input,
 .myProductsForm textarea.input,
 .myProductsForm select.input {
@@ -1120,7 +1458,8 @@ a {
   width: 126px;
   aspect-ratio: 4 / 3;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background-color: #f5f7fb;
   border-radius: 12px;
   border: 1px solid #e8ecf3;
   background:
@@ -1131,6 +1470,67 @@ a {
 
 .myAdsItemMain {
   min-width: 0;
+}
+
+.myAdsOrderLines {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.myAdsOrderLine {
+  margin: 0;
+  font-size: 13px;
+  color: #475467;
+}
+
+.myAdsOrderLineCard {
+  border: 1px solid #eef2f6;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fbfdff;
+  display: grid;
+  gap: 6px;
+}
+
+.myAdsOrderRatingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.myAdsOrderStars {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.myAdsStarBtn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #cbd5e1;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 160ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.myAdsStarBtn:hover {
+  transform: translateY(-1px);
+  color: #fbbf24;
+  border-color: #fcd34d;
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.2);
+}
+
+.myAdsStarBtnActive {
+  color: #f59e0b;
+  border-color: #fbbf24;
+  background: linear-gradient(180deg, #fff7dd, #ffefbf);
 }
 
 .accountAvatarLink {
@@ -1628,7 +2028,8 @@ a {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background-color: #f5f7fb;
   border-radius: 16px;
   background:
     radial-gradient(160px 90px at 20% 20%, rgba(255, 255, 255, 0.45), transparent 70%),
@@ -1838,7 +2239,8 @@ body.product-modal-open {
   width: 100%;
   height: 430px;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background-color: #f5f7fb;
   border-radius: 14px;
   border: 1px solid #dbe6f8;
   background:
@@ -1870,29 +2272,31 @@ body.product-modal-open {
   width: 100%;
   height: 64px;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background-color: #f5f7fb;
 }
 
 .productTitle {
   margin: 0;
-  font-size: clamp(30px, 3.4vw, 42px);
-  line-height: 1.07;
+  font-size: clamp(24px, 2.2vw, 32px);
+  line-height: 1.1;
   letter-spacing: -0.02em;
   color: #0f172a;
 }
 
 .productSubtitle {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
+  font-size: 14px;
   color: #475467;
   max-width: 56ch;
 }
 
 .productPriceBlock {
-  margin-top: 16px;
+  margin-top: 12px;
   border: 1px solid #d4e1f7;
-  border-radius: 14px;
+  border-radius: 12px;
   background: linear-gradient(145deg, #fbfdff, #f2f7ff);
-  padding: 12px;
+  padding: 10px 11px;
 }
 
 .productPriceLabel {
@@ -1904,49 +2308,91 @@ body.product-modal-open {
 .productMainPrice {
   display: block;
   margin-top: 4px;
-  font-size: clamp(28px, 4vw, 40px);
+  font-size: clamp(22px, 2.7vw, 30px);
   line-height: 1;
   letter-spacing: -0.02em;
   color: #0b1220;
 }
 
 .productMetaStack {
-  margin-top: 14px;
+  margin-top: 10px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .productMetaItem {
   border: 1px solid #e1e9f8;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 8px 10px;
   background: #f9fbff;
 }
 
 .productMetaLabel {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: #667085;
 }
 
 .productMetaValue {
   display: block;
-  margin-top: 3px;
+  margin-top: 2px;
+  font-size: 15px;
   color: #1f2937;
   font-weight: 600;
 }
 
+.productSellerLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.productSellerRatingBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #f9d68a;
+  background: #fffbeb;
+  color: #b45309;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .productActions {
-  margin-top: 14px;
+  margin-top: 10px;
   display: grid;
-  gap: 9px;
+  gap: 7px;
+}
+
+.productQtyControl {
+  display: grid;
+  gap: 5px;
+}
+
+.productQtyControl > span {
+  font-size: 11px;
+  color: #667085;
+}
+
+.productStockBanner {
+  border: 1px solid #fecdd3;
+  background: linear-gradient(180deg, #fff1f2, #ffe4e6);
+  color: #9f1239;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 13px;
 }
 
 .productPrimaryBtn,
 .productGhostBtn {
-  border-radius: 12px;
-  height: 44px;
-  font-weight: 700;
+  border-radius: 10px;
+  height: 40px;
+  font-weight: 600;
+  font-size: 15px;
   cursor: pointer;
 }
 
@@ -1973,14 +2419,14 @@ body.product-modal-open {
 
 .productDetailsCard {
   border: 1px solid #dee7f7;
-  border-radius: 16px;
+  border-radius: 12px;
   background: #fff;
-  padding: 14px;
+  padding: 10px;
 }
 
 .productSectionTitle {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   color: #0f172a;
 }
 
@@ -2205,7 +2651,8 @@ body.product-modal-open {
   width: 100%;
   height: 96px;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background-color: #f5f7fb;
   border-radius: 12px;
   border: 1px solid #d6e3f8;
   background:
@@ -2396,6 +2843,30 @@ body.product-modal-open {
 
   .cartSummary {
     position: static;
+  }
+
+  .wbCartLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .wbCartSummary {
+    position: static;
+  }
+
+  .wbCartItemRow {
+    grid-template-columns: 20px 72px minmax(0, 1fr);
+  }
+
+  .myAdsItemPreview.wbCartPreview {
+    width: 72px;
+    height: 56px;
+    min-width: 72px;
+  }
+
+  .wbCartQty {
+    grid-column: 2 / 4;
+    justify-items: start;
+    margin-top: 4px;
   }
 }
 

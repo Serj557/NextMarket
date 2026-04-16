@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { clearAuthSession, readCurrentUser } from '../lib/authSession'
-import { readCart, removeFromCart } from '../lib/cart'
+import { getMyCart, removeFromCartApi, type CartItemDto, updateCartItemQuantityApi } from '../lib/cartApi'
+import { getMyFavorites, removeFavorite, type FavoriteItemDto } from '../lib/favoritesApi'
+import { createOrder, getMyOrders, markOrderCompleted, type OrderDto } from '../lib/ordersApi'
+import { rateProduct } from '../lib/ratingsApi'
 import { marketplaceCategories } from '../lib/categories'
-import { readFavorites, writeFavorites } from '../lib/favorites'
-import { filesToDataUrls, getProductImage, getProductImages, removeProductImage, saveProductImages } from '../lib/productImages'
 import {
   productsApi,
   type CreateProductRequest,
@@ -14,7 +15,61 @@ import {
 
 const adCategories: string[] = [...marketplaceCategories]
 
-type CabinetSection = 'my-products' | 'favorites' | 'cart' | 'settings'
+type CabinetSection = 'my-products' | 'favorites' | 'cart' | 'orders' | 'settings'
+
+type CabinetCartItem = {
+  id: string
+  title: string
+  unitPrice: number
+  quantity: number
+  stockQty: number
+  isOutOfStock: boolean
+  priceLabel: string
+  place: string
+  imageUrl: string | null
+}
+
+type CabinetFavoriteItem = {
+  id: string
+  title: string
+  priceLabel: string
+  place: string
+  imageUrl: string | null
+}
+
+type CabinetOrderItem = {
+  id: string
+  status: string
+  statusLabel: string
+  createdAtLabel: string
+  completedAtLabel: string | null
+  itemsCount: number
+  totalPriceLabel: string
+  lines: Array<{
+    lineId: string
+    productId: string
+    quantity: number
+    unitPriceLabel: string
+    lineTotalLabel: string
+    rating: number | null
+  }>
+}
+
+async function filesToDataUrls(files: File[]) {
+  const selected = files.slice(0, 6)
+  const items = await Promise.all(
+    selected.map(
+      (file) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result ?? ''))
+          reader.onerror = () => reject(new Error('Не удалось прочитать изображение.'))
+          reader.readAsDataURL(file)
+        }),
+    ),
+  )
+  return items.filter(Boolean)
+}
 
 export function MyProductsPage() {
   const navigate = useNavigate()
@@ -37,7 +92,12 @@ export function MyProductsPage() {
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [stockQty, setStockQty] = useState('1')
-  const [sectionVersion, setSectionVersion] = useState(0)
+  const [cabinetCartItems, setCabinetCartItems] = useState<CabinetCartItem[]>([])
+  const [selectedCartIds, setSelectedCartIds] = useState<string[]>([])
+  const [cabinetFavoriteItems, setCabinetFavoriteItems] = useState<CabinetFavoriteItem[]>([])
+  const [cabinetOrders, setCabinetOrders] = useState<CabinetOrderItem[]>([])
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false)
+  const [ratingByOrderLineId, setRatingByOrderLineId] = useState<Record<string, number>>({})
 
   const isLoggedIn = Boolean(user?.userId)
 
@@ -60,10 +120,68 @@ export function MyProductsPage() {
     setLoading(false)
   }
 
+  async function refreshCart() {
+    if (!user) return
+    const res = await getMyCart(user.userId)
+    if (!res.ok) {
+      setCabinetCartItems([])
+      setSelectedCartIds([])
+      return
+    }
+    const mapped = res.data.map(toCabinetCartItem)
+    setCabinetCartItems(mapped)
+    setSelectedCartIds((prev) => {
+      const prevSet = new Set(prev)
+      const next = mapped.filter((x) => !x.isOutOfStock).map((x) => x.id).filter((id) => prevSet.has(id))
+      if (next.length > 0) return next
+      return mapped.filter((x) => !x.isOutOfStock).map((x) => x.id)
+    })
+  }
+
   useEffect(() => {
     void loadMyProducts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.userId])
+
+  useEffect(() => {
+    if (selectedSection !== 'cart' || !user) return
+    let cancelled = false
+    void (async () => {
+      const res = await getMyCart(user.userId)
+      if (cancelled) return
+      if (!res.ok) {
+        setCabinetCartItems([])
+        setSelectedCartIds([])
+        return
+      }
+      const mapped = res.data.map(toCabinetCartItem)
+      setCabinetCartItems(mapped)
+      setSelectedCartIds((prev) => {
+        const prevSet = new Set(prev)
+        const next = mapped.filter((x) => !x.isOutOfStock).map((x) => x.id).filter((id) => prevSet.has(id))
+        if (next.length > 0) return next
+        return mapped.filter((x) => !x.isOutOfStock).map((x) => x.id)
+      })
+    })()
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void refreshCart()
+    }, 5000)
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshCart()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [selectedSection, user?.userId])
 
   function resetForm() {
     setEditingId(null)
@@ -86,9 +204,7 @@ export function MyProductsPage() {
       return
     }
     const selected = Array.from(files).slice(0, 6)
-    const previews = selected
-      .slice(0, 6)
-      .map((file) => URL.createObjectURL(file))
+    const previews = selected.slice(0, 6).map((file) => URL.createObjectURL(file))
     setPhotoPreviews(previews)
     setPhotoFiles(selected)
   }
@@ -109,12 +225,15 @@ export function MyProductsPage() {
 
     const normalizedPrice = Number(price.replace(',', '.'))
 
+    const imageUrls = photoFiles.length > 0 ? await filesToDataUrls(photoFiles) : photoPreviews
+
     const payloadBase = {
       sellerId: user.userId,
       title: title.trim(),
       description: fullDescription,
       price: normalizedPrice,
       stockQty: Number(stockQty),
+      imageUrls,
     }
 
     if (!category || !payloadBase.title || !saleLocation.trim()) {
@@ -135,10 +254,6 @@ export function MyProductsPage() {
       const payload: UpdateProductRequest = { ...payloadBase, isActive: true }
       const res = await productsApi.update(editingId, payload)
       if (!res.ok) return setError('error' in res ? res.error : 'Не удалось обновить объявление')
-      if (photoFiles.length > 0) {
-        const imageDataUrls = await filesToDataUrls(photoFiles)
-        saveProductImages(editingId, imageDataUrls)
-      }
       resetForm()
       await loadMyProducts()
       return
@@ -147,10 +262,6 @@ export function MyProductsPage() {
       const res = await productsApi.create(payload)
       if (!res.ok) return setError('error' in res ? res.error : 'Не удалось создать объявление')
       if (res.ok) {
-        if (photoFiles.length > 0) {
-          const imageDataUrls = await filesToDataUrls(photoFiles)
-          saveProductImages(res.data.id, imageDataUrls)
-        }
         resetForm()
         navigate(`/products/${res.data.id}`)
         return
@@ -164,7 +275,7 @@ export function MyProductsPage() {
     setCategory('')
     setCondition('used')
     setSaleLocation('')
-    setPhotoPreviews(getProductImages(item.id))
+    setPhotoPreviews(item.imageUrls ?? [])
     setPhotoFiles([])
     setDescription(item.description ?? '')
     setPrice(String(item.price))
@@ -175,7 +286,6 @@ export function MyProductsPage() {
     if (!user) return
     const res = await productsApi.remove(id, user.userId)
     if (!res.ok) return setError('error' in res ? res.error : 'Не удалось удалить объявление')
-    removeProductImage(id)
     setItems((prev) => prev.filter((item) => item.id !== id))
     await loadMyProducts()
   }
@@ -185,8 +295,6 @@ export function MyProductsPage() {
     return 'Добавление объявления'
   }, [editingId])
 
-  const favoriteItems = useMemo(() => readFavorites(), [sectionVersion, selectedSection])
-  const cartItems = useMemo(() => readCart(), [sectionVersion, selectedSection])
 
   const headerBySection = useMemo(() => {
     if (selectedSection === 'favorites') {
@@ -197,6 +305,9 @@ export function MyProductsPage() {
     }
     if (selectedSection === 'settings') {
       return { title: 'Настройки профиля', subtitle: 'Управление данными аккаунта и безопасностью.' }
+    }
+    if (selectedSection === 'orders') {
+      return { title: 'Мои заказы', subtitle: 'История заказов и состав каждой покупки.' }
     }
     return {
       title: createMode ? 'Размещение объявления' : 'Мои объявления',
@@ -215,10 +326,179 @@ export function MyProductsPage() {
     setSearchParams({ section })
   }
 
-  function removeFavoriteById(id: string) {
-    const next = readFavorites().filter((item) => item.id !== id)
-    writeFavorites(next)
-    setSectionVersion((x) => x + 1)
+  function toCabinetCartItem(item: CartItemDto): CabinetCartItem {
+    const isOutOfStock = item.stockQty <= 0
+    return {
+      id: item.productId,
+      title: item.title,
+      unitPrice: item.price,
+      quantity: item.quantity,
+      stockQty: item.stockQty,
+      isOutOfStock,
+      priceLabel: `${item.price.toLocaleString('ru-RU')} ₽`,
+      place: extractLocation(item.description),
+      imageUrl: item.imageUrls?.[0] ?? null,
+    }
+  }
+
+  function applyCartResponse(items: CartItemDto[]) {
+    const mapped = items.map(toCabinetCartItem)
+    setCabinetCartItems(mapped)
+    setSelectedCartIds((prev) => prev.filter((id) => mapped.some((x) => x.id === id && !x.isOutOfStock)))
+  }
+
+  function toCabinetFavoriteItem(item: FavoriteItemDto): CabinetFavoriteItem {
+    return {
+      id: item.productId,
+      title: item.title,
+      priceLabel: `${item.price.toLocaleString('ru-RU')} ₽`,
+      place: extractLocation(item.description),
+      imageUrl: item.imageUrls?.[0] ?? null,
+    }
+  }
+
+  function toCabinetOrderItem(order: OrderDto): CabinetOrderItem {
+    const lines = order.items.map((x, index) => {
+      const lineTotal = x.unitPrice * x.quantity
+      const lineId = `${order.id}:${x.productId}:${index}`
+      return {
+        lineId,
+        productId: x.productId,
+        quantity: x.quantity,
+        unitPriceLabel: `${x.unitPrice.toLocaleString('ru-RU')} ₽`,
+        lineTotalLabel: `${lineTotal.toLocaleString('ru-RU')} ₽`,
+        rating: ratingByOrderLineId[lineId] ?? null,
+      }
+    })
+    const total = order.items.reduce((sum, x) => sum + x.unitPrice * x.quantity, 0)
+    return {
+      id: order.id,
+      status: order.status,
+      statusLabel: order.status === 'completed' ? 'Доставлен' : 'Оформлен',
+      createdAtLabel: new Date(order.createdAt).toLocaleString('ru-RU'),
+      completedAtLabel: order.completedAt ? new Date(order.completedAt).toLocaleString('ru-RU') : null,
+      itemsCount: order.items.reduce((sum, x) => sum + x.quantity, 0),
+      totalPriceLabel: `${total.toLocaleString('ru-RU')} ₽`,
+      lines,
+    }
+  }
+
+  async function loadOrders() {
+    if (!user) return
+    const res = await getMyOrders(user.userId)
+    if (!res.ok) {
+      setCabinetOrders([])
+      setError('error' in res ? res.error : 'Не удалось загрузить заказы')
+      return
+    }
+    setCabinetOrders(res.data.map(toCabinetOrderItem))
+  }
+
+  async function onCheckout() {
+    if (!user || cabinetCartItems.length === 0) return
+    const selectedItems = cabinetCartItems.filter((item) => selectedCartIds.includes(item.id))
+    if (selectedItems.length === 0) {
+      setError('Выберите хотя бы один товар в корзине для оформления заказа.')
+      return
+    }
+    setError(null)
+    setIsCreatingOrder(true)
+    const payload = {
+      buyerId: user.userId,
+      items: selectedItems.map((x) => ({ productId: x.id, quantity: x.quantity })),
+    }
+    const res = await createOrder(payload)
+    if (!res.ok) {
+      setError('error' in res ? res.error : 'Не удалось оформить заказ')
+      setIsCreatingOrder(false)
+      return
+    }
+    await markOrderCompleted(res.data.id, user.userId)
+
+    for (const cartItem of selectedItems) {
+      // Keep cart and orders consistent after successful checkout.
+      await removeFromCartApi(user.userId, cartItem.id)
+    }
+
+    await loadOrders()
+    const freshCart = await getMyCart(user.userId)
+    if (freshCart.ok) {
+      const mapped = freshCart.data.map(toCabinetCartItem)
+      setCabinetCartItems(mapped)
+      setSelectedCartIds(mapped.map((x) => x.id))
+    } else {
+      setCabinetCartItems([])
+      setSelectedCartIds([])
+    }
+    setSearchParams({ section: 'orders' })
+    setIsCreatingOrder(false)
+  }
+
+  async function onRateSeller(lineId: string, productId: string, rating: number) {
+    if (!user) return
+    const res = await rateProduct(productId, user.userId, rating)
+    if (!res.ok) {
+      setError('error' in res ? res.error : 'Не удалось сохранить оценку')
+      return
+    }
+    setError(null)
+    setRatingByOrderLineId((prev) => ({ ...prev, [lineId]: rating }))
+    setCabinetOrders((prev) =>
+      prev.map((order) => ({
+        ...order,
+        lines: order.lines.map((line) => (line.lineId === lineId ? { ...line, rating } : line)),
+      })),
+    )
+  }
+
+  const selectedItems = useMemo(
+    () => cabinetCartItems.filter((item) => selectedCartIds.includes(item.id)),
+    [cabinetCartItems, selectedCartIds],
+  )
+  const selectedTotalLabel = useMemo(() => {
+    const total = selectedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+    return `${total.toLocaleString('ru-RU')} ₽`
+  }, [selectedItems])
+
+  function toggleCartItemSelection(productId: string) {
+    const target = cabinetCartItems.find((x) => x.id === productId)
+    if (!target || target.isOutOfStock) return
+    setSelectedCartIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId],
+    )
+  }
+
+  function toggleAllCartItems(checked: boolean) {
+    const selectable = cabinetCartItems.filter((x) => !x.isOutOfStock).map((x) => x.id)
+    setSelectedCartIds(checked ? selectable : [])
+  }
+  useEffect(() => {
+    if (selectedSection !== 'favorites' || !user) return
+    let cancelled = false
+    void (async () => {
+      const res = await getMyFavorites(user.userId)
+      if (cancelled) return
+      if (!res.ok) return setCabinetFavoriteItems([])
+      setCabinetFavoriteItems(res.data.map(toCabinetFavoriteItem))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedSection, user?.userId])
+
+  useEffect(() => {
+    if (selectedSection !== 'orders' || !user) return
+    void loadOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSection, user?.userId])
+
+
+  function extractLocation(description?: string | null) {
+    if (!description) return 'Не указано'
+    const line = description
+      .split('\n')
+      .find((x) => x.trim().toLowerCase().startsWith('расположение:'))
+    return line ? line.replace(/расположение:\s*/i, '').trim() || 'Не указано' : 'Не указано'
   }
 
   if (!isLoggedIn) {
@@ -244,8 +524,8 @@ export function MyProductsPage() {
           </Link>
           <nav className="myAdsTopLinks" aria-label="Разделы">
             <Link to="/">Главная</Link>
-            <Link to="/favorites">Избранное</Link>
-            <Link to="/cart">Корзина</Link>
+            <Link to="/my-products?section=favorites">Избранное</Link>
+            <Link to="/my-products?section=cart">Корзина</Link>
             <Link to="/profile">Профиль</Link>
           </nav>
           <button className="menuGhostBtn logoutBtn" type="button" onClick={onLogout}>
@@ -297,6 +577,16 @@ export function MyProductsPage() {
               Корзина
             </Link>
             <Link
+              className={`myAdsSidebarLink ${selectedSection === 'orders' ? 'myAdsSidebarLinkActive' : ''}`}
+              to="/my-products?section=orders"
+              onClick={(e) => {
+                e.preventDefault()
+                switchSection('orders')
+              }}
+            >
+              Заказы
+            </Link>
+            <Link
               className={`myAdsSidebarLink ${selectedSection === 'settings' ? 'myAdsSidebarLinkActive' : ''}`}
               to="/my-products?section=settings"
               onClick={(e) => {
@@ -310,9 +600,9 @@ export function MyProductsPage() {
         </aside>
 
         <div className="myAdsMain">
-          <header className="myAdsHeader">
-            <h1 className="myAdsTitle">{headerBySection.title}</h1>
-            <p className="myAdsSubtitle">{headerBySection.subtitle}</p>
+          <header className={`myAdsHeader ${selectedSection === 'cart' ? 'wbCartPageHeader' : ''}`}>
+            <h1 className={`myAdsTitle ${selectedSection === 'cart' ? 'wbCartPageTitle' : ''}`}>{headerBySection.title}</h1>
+            <p className={`myAdsSubtitle ${selectedSection === 'cart' ? 'wbCartPageSubtitle' : ''}`}>{headerBySection.subtitle}</p>
             {isMyProductsSection && !createMode ? (
               <div className="myAdsTabs">
                 <span className="myAdsTab myAdsTabActive">Активные {items.length}</span>
@@ -425,6 +715,18 @@ export function MyProductsPage() {
                   onChange={(e) => setPrice(e.target.value)}
                 />
               </label>
+              <label className="field">
+                <span className="label">Количество товара</span>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="Например: 3"
+                  value={stockQty}
+                  onChange={(e) => setStockQty(e.target.value)}
+                />
+              </label>
 
               <div className="myProductsActions">
                 <button className="productPrimaryBtn" type="submit">
@@ -451,8 +753,8 @@ export function MyProductsPage() {
             <div className="myProductsList myAdsList">
               {items.map((item) => (
                 <article key={item.id} className="myProductCard myAdsItemCard">
-                  {getProductImage(item.id) ? (
-                    <img className="myAdsItemPreview" src={getProductImage(item.id) ?? ''} alt={item.title} />
+                  {item.imageUrls?.[0] ? (
+                    <img className="myAdsItemPreview" src={item.imageUrls[0]} alt={item.title} />
                   ) : (
                     <div className="myAdsItemPreview" />
                   )}
@@ -465,7 +767,15 @@ export function MyProductsPage() {
                       <button className="menuGhostBtn" type="button" onClick={() => startEdit(item)}>
                         Редактировать
                       </button>
-                      <button className="logoutBtn menuGhostBtn" type="button" onClick={() => removeItem(item.id)}>
+                      <button
+                        className="logoutBtn menuGhostBtn"
+                        type="button"
+                        onClick={() => {
+                          const confirmed = window.confirm('Удалить объявление безвозвратно?')
+                          if (!confirmed) return
+                          void removeItem(item.id)
+                        }}
+                      >
                         Удалить
                       </button>
                       <Link className="menuGhostBtn" to={`/products/${item.id}`}>
@@ -480,7 +790,7 @@ export function MyProductsPage() {
 
           {selectedSection === 'favorites' ? (
             <div className="myProductsList myAdsList">
-              {favoriteItems.length === 0 ? (
+              {cabinetFavoriteItems.length === 0 ? (
                 <article className="myProductCard">
                   <div>
                     <h3 className="myProductTitle">Избранное пусто</h3>
@@ -488,14 +798,27 @@ export function MyProductsPage() {
                   </div>
                 </article>
               ) : (
-                favoriteItems.map((item) => (
+                cabinetFavoriteItems.map((item) => (
                   <article key={item.id} className="myProductCard myAdsItemCard">
-                    <div className="myAdsItemPreview" />
+                    {item.imageUrl ? (
+                      <img className="myAdsItemPreview" src={item.imageUrl} alt={item.title} />
+                    ) : (
+                      <div className="myAdsItemPreview" />
+                    )}
                     <div className="myAdsItemMain">
                       <h3 className="myProductTitle">{item.title}</h3>
-                      <p className="myProductMeta">{item.price} · {item.place}</p>
+                      <p className="myProductMeta">{item.priceLabel} · {item.place}</p>
                       <div className="myProductActions">
-                        <button className="logoutBtn menuGhostBtn" type="button" onClick={() => removeFavoriteById(item.id)}>
+                        <button
+                          className="logoutBtn menuGhostBtn"
+                          type="button"
+                          onClick={async () => {
+                            if (!user) return
+                            const res = await removeFavorite(user.userId, item.id)
+                            if (!res.ok) return
+                            setCabinetFavoriteItems(res.data.map(toCabinetFavoriteItem))
+                          }}
+                        >
                           Удалить
                         </button>
                         <Link className="menuGhostBtn" to="/">
@@ -510,40 +833,187 @@ export function MyProductsPage() {
           ) : null}
 
           {selectedSection === 'cart' ? (
+            <section className="wbCartLayout">
+              <div className="wbCartMain">
+                {cabinetCartItems.length === 0 ? (
+                  <article className="myProductCard">
+                    <div>
+                      <h3 className="myProductTitle">Корзина пуста</h3>
+                      <p className="myProductDesc">Добавьте товары из объявлений, чтобы оформить заказ.</p>
+                    </div>
+                  </article>
+                ) : (
+                  <article className="wbCartBlock">
+                    <header className="wbCartBlockHead">
+                      <h3 className="wbCartBlockTitle">Магазин · товары</h3>
+                      <label className="myAdsCheckboxLabel">
+                        <input
+                          type="checkbox"
+                          checked={cabinetCartItems.length > 0 && selectedCartIds.length === cabinetCartItems.length}
+                          onChange={(e) => toggleAllCartItems(e.target.checked)}
+                        />
+                        <span>Выбрать все</span>
+                      </label>
+                    </header>
+                    <div className="wbCartItems">
+                      {cabinetCartItems.map((item) => (
+                        <article key={item.id} className={`wbCartItemRow ${item.isOutOfStock ? 'wbCartItemRowMuted' : ''}`}>
+                          <label className="myAdsCheckboxLabel myAdsCheckboxLabelInline">
+                            <input
+                              type="checkbox"
+                              checked={selectedCartIds.includes(item.id)}
+                              disabled={item.isOutOfStock}
+                              onChange={() => toggleCartItemSelection(item.id)}
+                            />
+                          </label>
+                          {item.imageUrl ? (
+                            <img className="myAdsItemPreview wbCartPreview" src={item.imageUrl} alt={item.title} />
+                          ) : (
+                            <div className="myAdsItemPreview wbCartPreview" />
+                          )}
+                          <div className="wbCartInfo">
+                            <h4 className="myProductTitle">{item.title}</h4>
+                            <p className="myProductMeta">{item.place}</p>
+                            <p className="myProductMeta">
+                              {item.isOutOfStock ? 'Товар закончился' : `В корзине: ${item.quantity} шт.`}
+                            </p>
+                            <button
+                              className="logoutBtn menuGhostBtn wbCartRemoveBtn"
+                              type="button"
+                              onClick={async () => {
+                                if (!user) return
+                                const res = await removeFromCartApi(user.userId, item.id)
+                                if (!res.ok) return
+                                applyCartResponse(res.data)
+                                setSelectedCartIds((prev) => prev.filter((id) => id !== item.id))
+                              }}
+                            >
+                              Удалить
+                            </button>
+                          </div>
+                          <div className="wbCartQty">
+                            <div className="wbQtyLabel">Количество</div>
+                            <div className="wbQtyStepper" aria-label="Количество товара">
+                              <button
+                                type="button"
+                                className="wbQtyBtn"
+                                disabled={item.isOutOfStock || item.quantity <= 1}
+                                onClick={async () => {
+                                  if (!user || item.isOutOfStock || item.quantity <= 1) return
+                                  const res = await updateCartItemQuantityApi(user.userId, item.id, item.quantity - 1)
+                                  if (!res.ok) {
+                                    setError('error' in res ? res.error : 'Не удалось обновить количество')
+                                    void refreshCart()
+                                    return
+                                  }
+                                  setError(null)
+                                  applyCartResponse(res.data)
+                                }}
+                                aria-label="Уменьшить количество"
+                              >
+                                −
+                              </button>
+                              <span className="wbQtyValue">{item.quantity}</span>
+                              <button
+                                type="button"
+                                className="wbQtyBtn"
+                                disabled={item.isOutOfStock || item.quantity >= item.stockQty}
+                                onClick={async () => {
+                                  if (!user || item.isOutOfStock || item.quantity >= item.stockQty) return
+                                  const res = await updateCartItemQuantityApi(user.userId, item.id, item.quantity + 1)
+                                  if (!res.ok) {
+                                    setError('error' in res ? res.error : 'Не удалось обновить количество')
+                                    void refreshCart()
+                                    return
+                                  }
+                                  setError(null)
+                                  applyCartResponse(res.data)
+                                }}
+                                aria-label="Увеличить количество"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <strong className="wbCartLinePrice">
+                              {(item.unitPrice * item.quantity).toLocaleString('ru-RU')} ₽
+                            </strong>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </article>
+                )}
+                {cabinetCartItems.length > 0 ? (
+                  <article className="wbCartBlock">
+                    <h3 className="wbCartBlockTitle">Способ доставки</h3>
+                    <p className="myProductDesc">Выбрать адрес доставки</p>
+                  </article>
+                ) : null}
+              </div>
+
+              {cabinetCartItems.length > 0 ? (
+                <aside className="wbCartSummary">
+                  <h3 className="wbCartSummaryTitle">Итого</h3>
+                  <p className="wbCartSummaryMeta">Выбрано товаров: {selectedItems.length}</p>
+                  <div className="wbCartSummaryTotal">{selectedTotalLabel}</div>
+                  <button className="productPrimaryBtn wbCartOrderBtn" type="button" onClick={onCheckout} disabled={isCreatingOrder}>
+                    {isCreatingOrder ? 'Оформляем...' : 'Оформить заказ'}
+                  </button>
+                </aside>
+              ) : null}
+            </section>
+          ) : null}
+
+          {selectedSection === 'orders' ? (
             <div className="myProductsList myAdsList">
-              {cartItems.length === 0 ? (
+              {cabinetOrders.length === 0 ? (
                 <article className="myProductCard">
                   <div>
-                    <h3 className="myProductTitle">Корзина пуста</h3>
-                    <p className="myProductDesc">Добавьте товары из объявлений, чтобы оформить заказ.</p>
+                    <h3 className="myProductTitle">Заказов пока нет</h3>
+                    <p className="myProductDesc">Оформленные покупки будут отображаться в этом разделе.</p>
                   </div>
                 </article>
               ) : (
-                cartItems.map((item) => (
-                  <article key={item.id} className="myProductCard myAdsItemCard">
-                    {item.imageUrl ? (
-                      <img className="myAdsItemPreview" src={item.imageUrl} alt={item.title} />
-                    ) : (
-                      <div className="myAdsItemPreview" />
-                    )}
-                    <div className="myAdsItemMain">
-                      <h3 className="myProductTitle">{item.title}</h3>
-                      <p className="myProductMeta">{item.price} · {item.place}</p>
-                      <div className="myProductActions">
-                        <button
-                          className="logoutBtn menuGhostBtn"
-                          type="button"
-                          onClick={() => {
-                            removeFromCart(item.id)
-                            setSectionVersion((x) => x + 1)
-                          }}
-                        >
-                          Удалить
-                        </button>
-                        <Link className="menuGhostBtn" to="/cart">
-                          Детали корзины
-                        </Link>
+                cabinetOrders.map((order) => (
+                  <article key={order.id} className="myProductCard">
+                    <div>
+                      <h3 className="myProductTitle">Заказ #{order.id.slice(0, 8)}</h3>
+                      <p className="myProductMeta">
+                        Статус: {order.statusLabel} · Позиций: {order.itemsCount} · Сумма: {order.totalPriceLabel}
+                      </p>
+                      <p className="myProductDesc">
+                        Создан: {order.createdAtLabel}
+                        {order.completedAtLabel ? ` · Завершен: ${order.completedAtLabel}` : ''}
+                      </p>
+                      <div className="myAdsOrderLines">
+                        {order.lines.map((line) => (
+                          <div key={`${order.id}-${line.productId}`} className="myAdsOrderLineCard">
+                            <p className="myAdsOrderLine">
+                              {line.quantity} × {line.unitPriceLabel} = {line.lineTotalLabel}
+                            </p>
+                            <div className="myAdsOrderRatingRow">
+                              <span>Оценить продавца:</span>
+                              <div className="myAdsOrderStars">
+                                {[1, 2, 3, 4, 5].map((score) => (
+                                  <button
+                                    key={`${line.lineId}-${score}`}
+                                    className={`myAdsStarBtn ${(line.rating ?? 0) >= score ? 'myAdsStarBtnActive' : ''}`}
+                                    type="button"
+                                    onClick={() => void onRateSeller(line.lineId, line.productId, score)}
+                                  >
+                                    ★
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
+                    </div>
+                    <div className="myProductActions">
+                      <Link className="menuGhostBtn" to="/">
+                        В каталог
+                      </Link>
                     </div>
                   </article>
                 ))

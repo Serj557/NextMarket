@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { clearAuthSession, readCurrentUser } from '../lib/authSession'
 import { marketplaceCategories } from '../lib/categories'
-import { readFavorites, toFavoriteProduct, writeFavorites } from '../lib/favorites'
-import { getProductImage } from '../lib/productImages'
+import { addFavorite, getMyFavorites, removeFavorite } from '../lib/favoritesApi'
 import { productsApi, type ProductResponse } from '../lib/productsApi'
 
 type CategoryItem = {
@@ -41,8 +40,8 @@ function toHomeCard(item: ProductResponse): ProductItem {
     title: item.title,
     price: `${item.price.toLocaleString('ru-RU')} ₽`,
     place: extractLocation(item.description),
-    badge: item.averageRating ? `Рейтинг ${item.averageRating.toFixed(1)}` : 'Новое',
-    imageUrl: getProductImage(item.id),
+    badge: 'Новое',
+    imageUrl: item.imageUrls?.[0] ?? null,
     category,
   }
 }
@@ -55,18 +54,18 @@ export function HomePage() {
   const [searchText, setSearchText] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [currentUser, setCurrentUser] = useState(() => readCurrentUser())
-  const [favorites, setFavorites] = useState(() => readFavorites())
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([])
   const [allProducts, setAllProducts] = useState<ProductItem[]>([])
   const [filteredProducts, setFilteredProducts] = useState<ProductItem[]>([])
 
-  function toggleFavorite(item: ProductItem) {
-    const favoriteItem = toFavoriteProduct(item)
-    const exists = favorites.some((fav) => fav.id === favoriteItem.id)
-    const next = exists
-      ? favorites.filter((fav) => fav.id !== favoriteItem.id)
-      : [...favorites, favoriteItem]
-    setFavorites(next)
-    writeFavorites(next)
+  async function toggleFavorite(item: ProductItem) {
+    if (!currentUser) return
+    const exists = favoriteIds.includes(item.id)
+    const res = exists
+      ? await removeFavorite(currentUser.userId, item.id)
+      : await addFavorite(currentUser.userId, item.id)
+    if (!res.ok) return
+    setFavoriteIds(res.data.map((x) => x.productId))
   }
 
   function onLogout() {
@@ -81,17 +80,47 @@ export function HomePage() {
 
   useEffect(() => {
     let cancelled = false
-    void (async () => {
+    let retryTimer: number | undefined
+
+    const loadProducts = async (attempt = 0) => {
       const res = await productsApi.getAll()
-      if (!res.ok || cancelled) return
+      if (cancelled) return
+      if (!res.ok) {
+        if (attempt < 5) {
+          retryTimer = window.setTimeout(() => {
+            void loadProducts(attempt + 1)
+          }, 1400)
+        }
+        return
+      }
       const next = res.data.map(toHomeCard)
       setAllProducts(next)
       setFilteredProducts(next)
+    }
+
+    void loadProducts()
+
+    return () => {
+      cancelled = true
+      if (retryTimer) window.clearTimeout(retryTimer)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!currentUser) {
+      setFavoriteIds([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await getMyFavorites(currentUser.userId)
+      if (!res.ok || cancelled) return
+      setFavoriteIds(res.data.map((x) => x.productId))
     })()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentUser?.userId])
 
   useEffect(() => {
     const query = searchText.trim().toLowerCase()
@@ -225,10 +254,10 @@ export function HomePage() {
             <span className="brandMeta">Маркетплейс для повседневных покупок</span>
           </div>
           <div className="marketNavActions">
-            <Link className="menuGhostBtn" to="/favorites">
+            <Link className="menuGhostBtn" to={currentUser ? '/my-products?section=favorites' : '/login'}>
               Избранное
             </Link>
-            <Link className="menuGhostBtn" to="/cart">
+            <Link className="menuGhostBtn" to={currentUser ? '/my-products?section=cart' : '/login'}>
               Корзина
             </Link>
             {currentUser ? (
@@ -329,8 +358,7 @@ export function HomePage() {
             <h2 className="homeSectionTitle">Рекомендации для вас</h2>
             <div className="productGrid">
               {filteredProducts.map((item, index) => {
-                const favoriteId = toFavoriteProduct(item).id
-                const isFavorite = favorites.some((fav) => fav.id === favoriteId)
+                const isFavorite = favoriteIds.includes(item.id)
                 return (
                 <article key={`${item.title}-${item.price}-${item.place}-${index}`} className="offerBtn">
                   <Link

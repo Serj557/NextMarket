@@ -1,7 +1,5 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { CartPage } from './pages/CartPage'
-import { FavoritesPage } from './pages/FavoritesPage'
 import { HelpPage } from './pages/HelpPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
@@ -17,9 +15,8 @@ export function App() {
 
   useEffect(() => {
     const isAuthRoute = pathname === '/login' || pathname === '/register'
-    const isCartRoute = pathname === '/cart'
     document.body.classList.toggle('auth-clouds-active', isAuthRoute)
-    document.body.classList.toggle('cart-clouds-active', isCartRoute)
+    document.body.classList.remove('cart-clouds-active')
   }, [pathname])
 
   return (
@@ -27,8 +24,6 @@ export function App() {
       <Routes location={state?.backgroundLocation || location}>
         <Route path="/" element={<HomePage />} />
         <Route path="/help" element={<HelpPage />} />
-        <Route path="/favorites" element={<FavoritesPage />} />
-        <Route path="/cart" element={<CartPage />} />
         <Route path="/products/:productId" element={<ProductPage />} />
         <Route path="/my-products" element={<MyProductsPage />} />
         <Route path="/profile" element={<ProfilePage />} />

@@ -11,4 +11,6 @@ public class User
     public ICollection<Product> Products { get; set; } = new List<Product>();
     public ICollection<Order> Orders { get; set; } = new List<Order>();
     public ICollection<ProductRating> ProductRatings { get; set; } = new List<ProductRating>();
+    public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
+    public ICollection<Favorite> Favorites { get; set; } = new List<Favorite>();
 }

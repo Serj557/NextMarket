@@ -15,4 +15,7 @@ public class Product
     public User Seller { get; set; } = null!;
     public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
     public ICollection<ProductRating> Ratings { get; set; } = new List<ProductRating>();
+    public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
+    public ICollection<ProductImage> ProductImages { get; set; } = new List<ProductImage>();
+    public ICollection<Favorite> Favorites { get; set; } = new List<Favorite>();
 }

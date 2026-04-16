@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { addToCart } from '../lib/cart'
-import { getProductImage, getProductImages } from '../lib/productImages'
+import { readCurrentUser } from '../lib/authSession'
+import { addToCartApi, getMyCart } from '../lib/cartApi'
 import { productsApi, type ProductResponse } from '../lib/productsApi'
+import { getUserById } from '../lib/usersApi'
 
 type Props = {
   modal?: boolean
@@ -46,12 +47,18 @@ export function ProductPage({ modal = false }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [product, setProduct] = useState<ProductResponse | null>(null)
   const [similarItems, setSimilarItems] = useState<ProductResponse[]>([])
-  const productImages = useMemo(() => (product ? getProductImages(product.id) : []), [product])
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isAddingToCart, setIsAddingToCart] = useState(false)
+  const [cartQuantity, setCartQuantity] = useState(1)
+  const [sellerNameResolved, setSellerNameResolved] = useState<string>('')
+  const [sellerRatingResolved, setSellerRatingResolved] = useState<number | null>(null)
+  const productImages = useMemo(() => product?.imageUrls ?? [], [product?.imageUrls])
   const [activeImageIndex, setActiveImageIndex] = useState(0)
-  const imageUrl = productImages[activeImageIndex] ?? getProductImage(product?.id ?? '')
+  const imageUrl = productImages[activeImageIndex] ?? null
 
   const parsedDetails = useMemo(() => parseDescription(product?.description), [product?.description])
   const locationText = parsedDetails.location
+  const isOutOfStock = (product?.stockQty ?? 0) <= 0
 
   useEffect(() => {
     let cancelled = false
@@ -77,6 +84,47 @@ export function ProductPage({ modal = false }: Props) {
   }, [productId, productImages.length])
 
   useEffect(() => {
+    if (!product) return
+    setCartQuantity(product.stockQty > 0 ? 1 : 0)
+  }, [product?.id, product?.stockQty])
+
+  useEffect(() => {
+    if (!product) return
+    setSellerNameResolved(product.sellerName || '')
+    setSellerRatingResolved(typeof product.sellerRating === 'number' ? product.sellerRating : null)
+
+    const needsName = !product.sellerName
+    const needsRating = typeof product.sellerRating !== 'number'
+    if (!needsName && !needsRating) return
+
+    let cancelled = false
+    void (async () => {
+      if (needsName) {
+        const userRes = await getUserById(product.sellerId)
+        if (!cancelled && userRes.ok) {
+          setSellerNameResolved(userRes.data.name)
+        }
+      }
+
+      if (needsRating) {
+        const allRes = await productsApi.getAll()
+        if (!cancelled && allRes.ok) {
+          const sellerProducts = allRes.data.filter((x) => x.sellerId === product.sellerId)
+          const rated = sellerProducts
+            .map((x) => x.averageRating)
+            .filter((x): x is number => typeof x === 'number')
+          const avg = rated.length > 0 ? rated.reduce((sum, value) => sum + value, 0) / rated.length : null
+          setSellerRatingResolved(avg)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [product?.id, product?.sellerId, product?.sellerName, product?.sellerRating])
+
+  useEffect(() => {
     if (!modal) return
     document.body.classList.add('product-modal-open')
     return () => {
@@ -84,16 +132,54 @@ export function ProductPage({ modal = false }: Props) {
     }
   }, [modal])
 
-  function onAddToCart() {
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 2400)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  async function onAddToCart(e?: React.MouseEvent<HTMLButtonElement>) {
+    e?.preventDefault()
+    e?.stopPropagation()
     if (!product) return
-    addToCart({
-      id: product.id,
-      title: product.title,
-      price: `${product.price.toLocaleString('ru-RU')} ₽`,
-      place: locationText,
-      imageUrl: imageUrl ?? undefined,
+    if (isOutOfStock) {
+      setToast({ type: 'error', message: 'Товар закончился и сейчас недоступен для покупки.' })
+      return
+    }
+    setToast(null)
+    const user = readCurrentUser()
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    setIsAddingToCart(true)
+    const safeQty = Math.max(1, Math.min(cartQuantity || 1, Math.max(product.stockQty, 1)))
+    const res = await addToCartApi({
+      buyerId: user.userId,
+      productId: product.id,
+      quantity: safeQty,
     })
-    navigate('/cart')
+    if (!res.ok) {
+      const message = 'error' in res ? res.error : 'Не удалось добавить товар в корзину. Попробуйте еще раз.'
+      setToast({ type: 'error', message })
+      setIsAddingToCart(false)
+      return
+    }
+
+    const cartCheck = await getMyCart(user.userId)
+    const isAdded = cartCheck.ok && cartCheck.data.some((item) => item.productId === product.id)
+    setToast(
+      isAdded
+        ? { type: 'success', message: `Товар добавлен в корзину (${safeQty} шт.).` }
+        : { type: 'error', message: 'Товар не появился в корзине. Обновите страницу и попробуйте снова.' },
+    )
+    setIsAddingToCart(false)
+  }
+
+  function onOpenCartFromToast(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault()
+    setToast(null)
+    navigate('/my-products?section=cart')
   }
 
   if (isLoading) {
@@ -211,8 +297,11 @@ export function ProductPage({ modal = false }: Props) {
               </div>
               <div className="productMetaItem">
                 <span className="productMetaLabel">Продавец</span>
-                <span className="productMetaValue">
-                  ID продавца: {product.sellerId.slice(0, 8)}
+                <span className="productMetaValue productSellerLine">
+                  <span>{sellerNameResolved || `Пользователь ${product.sellerId.slice(0, 8)}`}</span>
+                  {typeof sellerRatingResolved === 'number' ? (
+                    <span className="productSellerRatingBadge">★ {sellerRatingResolved.toFixed(1)}</span>
+                  ) : null}
                 </span>
               </div>
               <div className="productMetaItem">
@@ -224,11 +313,40 @@ export function ProductPage({ modal = false }: Props) {
             </div>
 
             <div className="productActions">
+              {product.stockQty > 1 ? (
+                <label className="productQtyControl">
+                  <span>Количество</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    max={product.stockQty}
+                    step={1}
+                    value={cartQuantity}
+                    onChange={(e) => {
+                      const next = Number(e.target.value)
+                      if (!Number.isFinite(next)) return
+                      setCartQuantity(Math.max(1, Math.min(next, product.stockQty)))
+                    }}
+                  />
+                </label>
+              ) : null}
+              {isOutOfStock ? (
+                <div className="productStockBanner" role="status" aria-live="polite">
+                  Товар закончился - сейчас нет в наличии
+                </div>
+              ) : null}
               <button className="productPrimaryBtn" type="button">
                 Написать продавцу
               </button>
-              <button className="productGhostBtn" type="button" onClick={onAddToCart}>
-                Добавить в корзину
+              <button
+                className="productGhostBtn"
+                type="button"
+                onClick={onAddToCart}
+                disabled={isAddingToCart || isOutOfStock}
+                data-action="add-to-cart"
+              >
+                {isOutOfStock ? 'Нет в наличии' : isAddingToCart ? 'Добавляем...' : 'Добавить в корзину'}
               </button>
             </div>
           </aside>
@@ -247,6 +365,19 @@ export function ProductPage({ modal = false }: Props) {
           </div>
         </section>
       </section>
+      {toast ? (
+        <div className={`appToast ${toast.type === 'success' ? 'appToastSuccess' : 'appToastError'}`}>
+          {toast.message}
+          {toast.type === 'success' ? (
+            <>
+              {' '}
+              <Link to="/my-products?section=cart" onClick={onOpenCartFromToast}>
+                Открыть корзину
+              </Link>
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </main>
   )
 }

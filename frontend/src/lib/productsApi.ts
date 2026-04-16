@@ -36,12 +36,15 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<ApiResu
 export type ProductResponse = {
   id: string
   sellerId: string
+  sellerName: string
+  sellerRating?: number | null
   title: string
   description?: string | null
   price: number
   stockQty: number
   isActive: boolean
   averageRating?: number | null
+  imageUrls: string[]
   createdAt: string
   updatedAt: string
 }
@@ -52,6 +55,7 @@ export type CreateProductRequest = {
   description?: string
   price: number
   stockQty: number
+  imageUrls?: string[]
 }
 
 export type UpdateProductRequest = CreateProductRequest & { isActive: boolean }

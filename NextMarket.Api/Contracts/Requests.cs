@@ -16,7 +16,8 @@ public record CreateProductRequest(
     [Required, MaxLength(200)] string Title,
     string? Description,
     [Range(0.01, 9999999999)] decimal Price,
-    [Range(0, int.MaxValue)] int StockQty);
+    [Range(0, int.MaxValue)] int StockQty,
+    IReadOnlyCollection<string>? ImageUrls);
 
 public record UpdateProductRequest(
     [Required] Guid SellerId,
@@ -24,7 +25,8 @@ public record UpdateProductRequest(
     string? Description,
     [Range(0.01, 9999999999)] decimal Price,
     [Range(0, int.MaxValue)] int StockQty,
-    bool IsActive);
+    bool IsActive,
+    IReadOnlyCollection<string>? ImageUrls);
 
 public record CreateOrderRequest(
     [Required] Guid BuyerId,
@@ -39,3 +41,16 @@ public record SetOrderCompletedRequest([Required] Guid BuyerId);
 public record RateProductRequest(
     [Required] Guid UserId,
     [Range(1, 5)] int Rating);
+
+public record AddCartItemRequest(
+    [Required] Guid BuyerId,
+    [Required] Guid ProductId,
+    [Range(1, int.MaxValue)] int Quantity);
+
+public record UpdateCartItemQuantityRequest(
+    [Required] Guid BuyerId,
+    [Range(1, int.MaxValue)] int Quantity);
+
+public record AddFavoriteRequest(
+    [Required] Guid BuyerId,
+    [Required] Guid ProductId);

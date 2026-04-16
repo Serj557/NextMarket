@@ -30,6 +30,7 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
         };
 
         dbContext.Products.Add(product);
+        ApplyImageUrls(product, request.ImageUrls);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { id = product.Id }, await BuildProductResponse(product, cancellationToken));
@@ -55,13 +56,18 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
         product.StockQty = request.StockQty;
         product.IsActive = request.IsActive;
         product.UpdatedAt = DateTime.UtcNow;
+        var existingImages = await dbContext.ProductImages
+            .Where(x => x.ProductId == product.Id)
+            .ToListAsync(cancellationToken);
+        dbContext.ProductImages.RemoveRange(existingImages);
+        ApplyImageUrls(product, request.ImageUrls);
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return Ok(await BuildProductResponse(product, cancellationToken));
     }
 
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> SoftDelete(Guid id, [FromQuery] Guid sellerId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid sellerId, CancellationToken cancellationToken)
     {
         var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (product is null)
@@ -74,8 +80,13 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, "Нельзя удалять чужой товар.");
         }
 
-        product.IsActive = false;
-        product.UpdatedAt = DateTime.UtcNow;
+        var hasOrders = await dbContext.OrderItems.AnyAsync(x => x.ProductId == id, cancellationToken);
+        if (hasOrders)
+        {
+            return BadRequest("Нельзя удалить объявление, по которому уже есть заказы.");
+        }
+
+        dbContext.Products.Remove(product);
         await dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -96,13 +107,22 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             .Select(x => new
             {
                 Product = x,
-                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average()
+                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average(),
+                SellerName = x.Seller.Name,
+                SellerRating = x.Seller.Products
+                    .SelectMany(p => p.Ratings)
+                    .Select(r => (decimal?)r.Rating)
+                    .Average(),
+                ImageUrls = x.ProductImages
+                    .OrderBy(i => i.CreatedAt)
+                    .Select(i => i.ImageUrl)
+                    .ToList()
             })
             .Where(x => !minRating.HasValue || (x.AverageRating ?? 0) >= minRating.Value)
             .OrderByDescending(x => x.Product.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return Ok(products.Select(x => ToResponse(x.Product, x.AverageRating)).ToList());
+        return Ok(products.Select(x => ToResponse(x.Product, x.AverageRating, x.SellerName, x.SellerRating, x.ImageUrls)).ToList());
     }
 
     [HttpGet("{id:guid}")]
@@ -114,7 +134,16 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             .Select(x => new
             {
                 Product = x,
-                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average()
+                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average(),
+                SellerName = x.Seller.Name,
+                SellerRating = x.Seller.Products
+                    .SelectMany(p => p.Ratings)
+                    .Select(r => (decimal?)r.Rating)
+                    .Average(),
+                ImageUrls = x.ProductImages
+                    .OrderBy(i => i.CreatedAt)
+                    .Select(i => i.ImageUrl)
+                    .ToList()
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -123,7 +152,7 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             return NotFound("Товар не найден.");
         }
 
-        return Ok(ToResponse(item.Product, item.AverageRating));
+        return Ok(ToResponse(item.Product, item.AverageRating, item.SellerName, item.SellerRating, item.ImageUrls));
     }
 
     [HttpGet("my")]
@@ -141,12 +170,21 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             .Select(x => new
             {
                 Product = x,
-                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average()
+                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average(),
+                SellerName = x.Seller.Name,
+                SellerRating = x.Seller.Products
+                    .SelectMany(p => p.Ratings)
+                    .Select(r => (decimal?)r.Rating)
+                    .Average(),
+                ImageUrls = x.ProductImages
+                    .OrderBy(i => i.CreatedAt)
+                    .Select(i => i.ImageUrl)
+                    .ToList()
             })
             .OrderByDescending(x => x.Product.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return Ok(products.Select(x => ToResponse(x.Product, x.AverageRating)).ToList());
+        return Ok(products.Select(x => ToResponse(x.Product, x.AverageRating, x.SellerName, x.SellerRating, x.ImageUrls)).ToList());
     }
 
     [HttpGet("my/{id:guid}")]
@@ -158,7 +196,16 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             .Select(x => new
             {
                 Product = x,
-                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average()
+                AverageRating = x.Ratings.Select(r => (decimal?)r.Rating).Average(),
+                SellerName = x.Seller.Name,
+                SellerRating = x.Seller.Products
+                    .SelectMany(p => p.Ratings)
+                    .Select(r => (decimal?)r.Rating)
+                    .Average(),
+                ImageUrls = x.ProductImages
+                    .OrderBy(i => i.CreatedAt)
+                    .Select(i => i.ImageUrl)
+                    .ToList()
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -172,7 +219,7 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, "Нельзя просматривать детали чужого товара.");
         }
 
-        return Ok(ToResponse(item.Product, item.AverageRating));
+        return Ok(ToResponse(item.Product, item.AverageRating, item.SellerName, item.SellerRating, item.ImageUrls));
     }
 
     private async Task<ProductResponse> BuildProductResponse(Product product, CancellationToken cancellationToken)
@@ -182,19 +229,71 @@ public class ProductsController(AppDbContext dbContext) : ControllerBase
             .Select(x => (decimal?)x.Rating)
             .AverageAsync(cancellationToken);
 
-        return ToResponse(product, avgRating);
+        var sellerInfo = await dbContext.Users
+            .AsNoTracking()
+            .Where(x => x.Id == product.SellerId)
+            .Select(x => new
+            {
+                x.Name,
+                SellerRating = x.Products
+                    .SelectMany(p => p.Ratings)
+                    .Select(r => (decimal?)r.Rating)
+                    .Average()
+            })
+            .FirstAsync(cancellationToken);
+
+        var imageUrls = await dbContext.ProductImages
+            .AsNoTracking()
+            .Where(x => x.ProductId == product.Id)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => x.ImageUrl)
+            .ToListAsync(cancellationToken);
+
+        return ToResponse(product, avgRating, sellerInfo.Name, sellerInfo.SellerRating, imageUrls);
     }
 
-    private static ProductResponse ToResponse(Product product, decimal? averageRating) =>
+    private static ProductResponse ToResponse(
+        Product product,
+        decimal? averageRating,
+        string sellerName,
+        decimal? sellerRating,
+        IReadOnlyCollection<string> imageUrls) =>
         new(
             product.Id,
             product.SellerId,
+            sellerName,
+            sellerRating,
             product.Title,
             product.Description,
             product.Price,
             product.StockQty,
             product.IsActive,
             averageRating,
+            imageUrls,
             product.CreatedAt,
             product.UpdatedAt);
+
+    private static void ApplyImageUrls(Product product, IReadOnlyCollection<string>? imageUrls)
+    {
+        product.ProductImages.Clear();
+        if (imageUrls is null)
+        {
+            return;
+        }
+
+        var normalized = imageUrls
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Take(6)
+            .ToList();
+
+        foreach (var imageUrl in normalized)
+        {
+            product.ProductImages.Add(new ProductImage
+            {
+                ProductId = product.Id,
+                ImageUrl = imageUrl.Trim(),
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+    }
 }

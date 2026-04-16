@@ -10,6 +10,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<ProductRating> ProductRatings => Set<ProductRating>();
+    public DbSet<CartItem> CartItems => Set<CartItem>();
+    public DbSet<Favorite> Favorites => Set<Favorite>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -132,6 +135,80 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasOne(x => x.User)
                 .WithMany(x => x.ProductRatings)
                 .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CartItem>(entity =>
+        {
+            entity.ToTable("cart_items");
+            entity.ToTable(x =>
+            {
+                x.HasCheckConstraint("ck_cart_items_quantity_gt_0", "\"quantity\" > 0");
+            });
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.BuyerId).HasColumnName("buyer_id").IsRequired();
+            entity.Property(x => x.ProductId).HasColumnName("product_id").IsRequired();
+            entity.Property(x => x.Quantity).HasColumnName("quantity").IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(x => x.BuyerId);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasIndex(x => new { x.BuyerId, x.ProductId }).IsUnique();
+
+            entity.HasOne(x => x.Buyer)
+                .WithMany(x => x.CartItems)
+                .HasForeignKey(x => x.BuyerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Product)
+                .WithMany(x => x.CartItems)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Favorite>(entity =>
+        {
+            entity.ToTable("favorites");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.BuyerId).HasColumnName("buyer_id").IsRequired();
+            entity.Property(x => x.ProductId).HasColumnName("product_id").IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasIndex(x => x.BuyerId);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasIndex(x => new { x.BuyerId, x.ProductId }).IsUnique();
+
+            entity.HasOne(x => x.Buyer)
+                .WithMany(x => x.Favorites)
+                .HasForeignKey(x => x.BuyerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Product)
+                .WithMany(x => x.Favorites)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductImage>(entity =>
+        {
+            entity.ToTable("product_images");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.ProductId).HasColumnName("product_id").IsRequired();
+            entity.Property(x => x.ImageUrl).HasColumnName("image_url").IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasIndex(x => x.ProductId);
+
+            entity.HasOne(x => x.Product)
+                .WithMany(x => x.ProductImages)
+                .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
