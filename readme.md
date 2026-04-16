@@ -43,20 +43,43 @@
 
 ## Запуск
 
-1. Указать строку подключения к PostgreSQL в `NextMarket.Api/appsettings.json`:
+### Backend (ASP.NET Core)
 
-`ConnectionStrings:DefaultConnection`
+Для локальной разработки используем **User Secrets** (чтобы пароль не попадал в git).
 
-2. Перейти в папку проекта:
+1. Перейти в папку проекта:
 
 `cd NextMarket.Api`
 
-3. Выполнить команды:
+2. Инициализировать secrets и задать строку подключения:
+
+```bash
+dotnet user-secrets init
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=nextmarket_db;Username=postgres;Password=12345"
+dotnet user-secrets set "Jwt:Key" "dev-secret-change-me-please-32+chars"
+```
+
+3. Применить миграции (если база пустая):
+
+```bash
+dotnet tool install --global dotnet-ef
+dotnet ef database update
+```
+
+4. Выполнить команды:
 
 `dotnet restore`  
 `dotnet build`  
 `dotnet run`
 
-4. Swagger:
+5. Swagger:
 
 `https://localhost:<port>/swagger`
+
+### Frontend (React + Vite)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```

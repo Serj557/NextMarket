@@ -12,7 +12,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const canSubmit = useMemo(() => email.trim().length > 3 && password.length >= 4, [email, password])
+  const canSubmit = useMemo(() => email.trim().length > 3 && password.length >= 6, [email, password])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
