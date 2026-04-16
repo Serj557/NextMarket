@@ -4,6 +4,8 @@ public record UserResponse(Guid Id, string Email, string Name, DateTime CreatedA
 
 public record AuthResponse(string Token, Guid UserId, string Email, string Name);
 
+public record MyRatingResponse(Guid ProductId, int Rating, DateTime CreatedAt);
+
 public record ProductResponse(
     Guid Id,
     Guid SellerId,

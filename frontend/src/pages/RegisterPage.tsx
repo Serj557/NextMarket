@@ -16,7 +16,7 @@ export function RegisterPage() {
 
   const passwordsMatch = password.length > 0 && password === password2
   const canSubmit = useMemo(() => {
-    return name.trim().length >= 2 && email.trim().length > 3 && password.length >= 4 && passwordsMatch
+    return name.trim().length >= 2 && email.trim().length > 3 && password.length >= 6 && passwordsMatch
   }, [name, email, password, passwordsMatch])
 
   async function onSubmit(e: React.FormEvent) {
@@ -75,7 +75,7 @@ export function RegisterPage() {
             className="input"
             type="password"
             autoComplete="new-password"
-            placeholder="Минимум 4 символа"
+            placeholder="Минимум 6 символов"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

@@ -4,7 +4,7 @@ import { clearAuthSession, readCurrentUser } from '../lib/authSession'
 import { getMyCart, removeFromCartApi, type CartItemDto, updateCartItemQuantityApi } from '../lib/cartApi'
 import { getMyFavorites, removeFavorite } from '../lib/favoritesApi'
 import { createOrder, getMyOrders, markOrderCompleted } from '../lib/ordersApi'
-import { rateProduct } from '../lib/ratingsApi'
+import { getMyRatings, rateProduct } from '../lib/ratingsApi'
 import { marketplaceCategories } from '../lib/categories'
 import { formatRub } from '../lib/format'
 import {
@@ -34,6 +34,10 @@ export function MyProductsPage() {
   const isMyProductsSection = selectedSection === 'my-products'
   const createMode = isMyProductsSection && searchParams.get('mode') === 'create'
   const user = readCurrentUser()
+  const storageKeyPrefix = useMemo(
+    () => (user?.userId ? `nextmarket:reviews:${user.userId}` : 'nextmarket:reviews:anon'),
+    [user?.userId],
+  )
   const [items, setItems] = useState<ProductResponse[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,7 +59,34 @@ export function MyProductsPage() {
   const [isCreatingOrder, setIsCreatingOrder] = useState(false)
   const [ratingByOrderLineId, setRatingByOrderLineId] = useState<Record<string, number>>({})
 
+  const [reviewModal, setReviewModal] = useState<{
+    open: boolean
+    lineId: string | null
+    productId: string | null
+  }>({ open: false, lineId: null, productId: null })
+  const [reviewRating, setReviewRating] = useState<number>(5)
+  const [isSendingReview, setIsSendingReview] = useState(false)
+
   const isLoggedIn = Boolean(user?.userId)
+
+  useEffect(() => {
+    try {
+      const rawRatings = localStorage.getItem(`${storageKeyPrefix}:ratings`)
+      const parsedRatings = rawRatings ? (JSON.parse(rawRatings) as Record<string, number>) : {}
+      setRatingByOrderLineId(parsedRatings && typeof parsedRatings === 'object' ? parsedRatings : {})
+    } catch {
+      setRatingByOrderLineId({})
+    }
+  }, [storageKeyPrefix])
+
+  useEffect(() => {
+    if (!user?.userId) return
+    try {
+      localStorage.setItem(`${storageKeyPrefix}:ratings`, JSON.stringify(ratingByOrderLineId))
+    } catch {
+      // ignore
+    }
+  }, [ratingByOrderLineId, storageKeyPrefix, user?.userId])
 
   function onLogout() {
     clearAuthSession()
@@ -296,7 +327,29 @@ export function MyProductsPage() {
       setError('error' in res ? res.error : 'Не удалось загрузить заказы')
       return
     }
-    setCabinetOrders(res.data.map((order) => toCabinetOrderItem(order, ratingByOrderLineId)))
+    // Pull ratings from backend to keep review state stable after refresh.
+    const ratingsRes = await getMyRatings()
+    const byProductId: Record<string, number> = {}
+    if (ratingsRes.ok) {
+      for (const r of ratingsRes.data) {
+        byProductId[r.productId] = r.rating
+      }
+    }
+
+    const nextRatingByLineId: Record<string, number> = {}
+    for (const order of res.data) {
+      for (const item of order.items) {
+        const lineId = `${order.id}:${item.productId}`
+        const rating = byProductId[item.productId]
+        if (typeof rating === 'number') nextRatingByLineId[lineId] = rating
+      }
+    }
+
+    if (Object.keys(nextRatingByLineId).length > 0) {
+      setRatingByOrderLineId((prev) => ({ ...prev, ...nextRatingByLineId }))
+    }
+
+    setCabinetOrders(res.data.map((order) => toCabinetOrderItem(order, { ...ratingByOrderLineId, ...nextRatingByLineId })))
   }
 
   async function onCheckout() {
@@ -341,7 +394,7 @@ export function MyProductsPage() {
 
   async function onRateSeller(lineId: string, productId: string, rating: number) {
     if (!user) return
-    const res = await rateProduct(productId, user.userId, rating)
+    const res = await rateProduct(productId, rating)
     if (!res.ok) {
       setError('error' in res ? res.error : 'Не удалось сохранить оценку')
       return
@@ -354,6 +407,29 @@ export function MyProductsPage() {
         lines: order.lines.map((line) => (line.lineId === lineId ? { ...line, rating } : line)),
       })),
     )
+  }
+
+  function openReviewModal(lineId: string, productId: string) {
+    setReviewRating(ratingByOrderLineId[lineId] ?? 5)
+    setReviewModal({ open: true, lineId, productId })
+  }
+
+  function closeReviewModal() {
+    if (isSendingReview) return
+    setReviewModal({ open: false, lineId: null, productId: null })
+  }
+
+  async function submitReview() {
+    if (!reviewModal.open || !reviewModal.lineId || !reviewModal.productId) return
+    if (!user) return
+
+    setIsSendingReview(true)
+    try {
+      await onRateSeller(reviewModal.lineId, reviewModal.productId, reviewRating)
+      setReviewModal({ open: false, lineId: null, productId: null })
+    } finally {
+      setIsSendingReview(false)
+    }
   }
 
   const selectedItems = useMemo(
@@ -396,6 +472,20 @@ export function MyProductsPage() {
     void loadOrders()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSection, user?.userId])
+
+  useEffect(() => {
+    if (selectedSection !== 'orders') return
+    // re-render ratings in already loaded orders when local storage loads ratings
+    setCabinetOrders((prev) =>
+      prev.map((order) => ({
+        ...order,
+        lines: order.lines.map((line) => ({
+          ...line,
+          rating: ratingByOrderLineId[line.lineId] ?? line.rating,
+        })),
+      })),
+    )
+  }, [ratingByOrderLineId, selectedSection])
 
 
   if (!isLoggedIn) {
@@ -889,19 +979,16 @@ export function MyProductsPage() {
                               {line.quantity} × {line.unitPriceLabel} = {line.lineTotalLabel}
                             </p>
                             <div className="myAdsOrderRatingRow">
-                              <span>Оценить продавца:</span>
-                              <div className="myAdsOrderStars">
-                                {[1, 2, 3, 4, 5].map((score) => (
-                                  <button
-                                    key={`${line.lineId}-${score}`}
-                                    className={`myAdsStarBtn ${(line.rating ?? 0) >= score ? 'myAdsStarBtnActive' : ''}`}
-                                    type="button"
-                                    onClick={() => void onRateSeller(line.lineId, line.productId, score)}
-                                  >
-                                    ★
-                                  </button>
-                                ))}
-                              </div>
+                              <span>
+                                {typeof line.rating === 'number' ? `Отзыв: ★ ${line.rating}` : 'Отзыв'}
+                              </span>
+                              <button
+                                className="menuGhostBtn"
+                                type="button"
+                                onClick={() => openReviewModal(line.lineId, line.productId)}
+                              >
+                                {typeof line.rating === 'number' ? 'Изменить отзыв' : 'Оставить отзыв'}
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -939,6 +1026,46 @@ export function MyProductsPage() {
           ) : null}
         </div>
       </section>
+
+      {reviewModal.open ? (
+        <div
+          className="myAdsModalOverlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={reviewModal.lineId && typeof ratingByOrderLineId[reviewModal.lineId] === 'number' ? 'Изменить отзыв' : 'Оставить отзыв'}
+          onClick={closeReviewModal}
+        >
+          <div className="myAdsModal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="myProductTitle">
+              {reviewModal.lineId && typeof ratingByOrderLineId[reviewModal.lineId] === 'number'
+                ? 'Изменить отзыв'
+                : 'Оставить отзыв'}
+            </h3>
+            <p className="myProductDesc">Выберите оценку от 1 до 5 и отправьте.</p>
+            <div className="myAdsOrderStars" aria-label="Оценка">
+              {[1, 2, 3, 4, 5].map((score) => (
+                <button
+                  key={`modal-score-${score}`}
+                  className={`myAdsStarBtn ${reviewRating >= score ? 'myAdsStarBtnActive' : ''}`}
+                  type="button"
+                  onClick={() => setReviewRating(score)}
+                  disabled={isSendingReview}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+            <div className="myProductsActions" style={{ marginTop: 12 }}>
+              <button className="productPrimaryBtn" type="button" onClick={() => void submitReview()} disabled={isSendingReview}>
+                {isSendingReview ? 'Отправляем…' : 'Отправить'}
+              </button>
+              <button className="productGhostBtn" type="button" onClick={closeReviewModal} disabled={isSendingReview}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }

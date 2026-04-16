@@ -56,6 +56,7 @@
 ```bash
 dotnet user-secrets init
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=nextmarket_db;Username=postgres;Password=12345"
+dotnet user-secrets set "Jwt:Key" "dev-secret-change-me-please-32+chars"
 ```
 
 3. Применить миграции (если база пустая):

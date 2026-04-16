@@ -68,9 +68,10 @@ export function toCabinetFavoriteItem(item: FavoriteItemDto): CabinetFavoriteIte
 }
 
 export function toCabinetOrderItem(order: OrderDto, ratingByLineId: Record<string, number>): CabinetOrderItem {
-  const lines = order.items.map((x, index) => {
+  const lines = order.items.map((x) => {
     const lineTotal = x.unitPrice * x.quantity
-    const lineId = `${order.id}:${x.productId}:${index}`
+    // Stable key (doesn't depend on array order/index)
+    const lineId = `${order.id}:${x.productId}`
     return {
       lineId,
       productId: x.productId,

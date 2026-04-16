@@ -39,7 +39,6 @@ public record CreateOrderItemRequest(
 public record SetOrderCompletedRequest([Required] Guid BuyerId);
 
 public record RateProductRequest(
-    [Required] Guid UserId,
     [Range(1, 5)] int Rating);
 
 public record AddCartItemRequest(
@@ -54,3 +53,4 @@ public record UpdateCartItemQuantityRequest(
 public record AddFavoriteRequest(
     [Required] Guid BuyerId,
     [Required] Guid ProductId);
+

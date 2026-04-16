@@ -316,9 +316,6 @@ export function ProductPage({ modal = false }: Props) {
                   Товар закончился - сейчас нет в наличии
                 </div>
               ) : null}
-              <button className="productPrimaryBtn" type="button">
-                Написать продавцу
-              </button>
               <button
                 className="productGhostBtn"
                 type="button"
