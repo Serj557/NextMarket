@@ -3,42 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { readCurrentUser } from '../lib/authSession'
 import { addToCartApi, getMyCart } from '../lib/cartApi'
 import { productsApi, type ProductResponse } from '../lib/productsApi'
+import { parseProductDescription } from '../lib/productDescription'
 import { getUserById } from '../lib/usersApi'
 
 type Props = {
   modal?: boolean
-}
-
-function parseDescription(description?: string | null) {
-  if (!description) {
-    return {
-      category: 'Не указана',
-      condition: 'Не указано',
-      location: 'Не указано',
-      text: 'Описание пока не заполнено.',
-    }
-  }
-
-  const lines = description.split('\n').map((x) => x.trim())
-  const categoryLine = lines.find((x) => x.toLowerCase().startsWith('категория:'))
-  const conditionLine = lines.find((x) => x.toLowerCase().startsWith('состояние:'))
-  const locationLine = lines.find((x) => x.toLowerCase().startsWith('расположение:'))
-  const text = lines
-    .filter(
-      (x) =>
-        x &&
-        !x.toLowerCase().startsWith('категория:') &&
-        !x.toLowerCase().startsWith('состояние:') &&
-        !x.toLowerCase().startsWith('расположение:'),
-    )
-    .join('\n')
-
-  return {
-    category: categoryLine?.replace(/категория:\s*/i, '').trim() || 'Не указана',
-    condition: conditionLine?.replace(/состояние:\s*/i, '').trim() || 'Не указано',
-    location: locationLine?.replace(/расположение:\s*/i, '').trim() || 'Не указано',
-    text: text || 'Описание пока не заполнено.',
-  }
 }
 
 export function ProductPage({ modal = false }: Props) {
@@ -56,7 +25,7 @@ export function ProductPage({ modal = false }: Props) {
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const imageUrl = productImages[activeImageIndex] ?? null
 
-  const parsedDetails = useMemo(() => parseDescription(product?.description), [product?.description])
+  const parsedDetails = useMemo(() => parseProductDescription(product?.description), [product?.description])
   const locationText = parsedDetails.location
   const isOutOfStock = (product?.stockQty ?? 0) <= 0
 
@@ -68,8 +37,19 @@ export function ProductPage({ modal = false }: Props) {
         productsApi.getById(productId),
         productsApi.getAll(),
       ])
-      if (!cancelled && byIdRes.ok) setProduct(byIdRes.data)
-      if (!cancelled && allRes.ok) {
+      if (cancelled) return
+
+      if (byIdRes.ok) setProduct(byIdRes.data)
+
+      if (byIdRes.ok && allRes.ok) {
+        const currentCategory = parseProductDescription(byIdRes.data.description).category
+        const sameCategory = allRes.data
+          .filter((item) => item.id !== productId)
+          .filter((item) => parseProductDescription(item.description).category === currentCategory)
+          .slice(0, 3)
+        setSimilarItems(sameCategory)
+      } else if (allRes.ok) {
+        // fallback: если карточка не загрузилась, покажем любые 3 (как было раньше)
         setSimilarItems(allRes.data.filter((item) => item.id !== productId).slice(0, 3))
       }
       if (!cancelled) setIsLoading(false)

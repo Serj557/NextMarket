@@ -2,74 +2,30 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { clearAuthSession, readCurrentUser } from '../lib/authSession'
 import { getMyCart, removeFromCartApi, type CartItemDto, updateCartItemQuantityApi } from '../lib/cartApi'
-import { getMyFavorites, removeFavorite, type FavoriteItemDto } from '../lib/favoritesApi'
-import { createOrder, getMyOrders, markOrderCompleted, type OrderDto } from '../lib/ordersApi'
+import { getMyFavorites, removeFavorite } from '../lib/favoritesApi'
+import { createOrder, getMyOrders, markOrderCompleted } from '../lib/ordersApi'
 import { rateProduct } from '../lib/ratingsApi'
 import { marketplaceCategories } from '../lib/categories'
+import { formatRub } from '../lib/format'
 import {
   productsApi,
   type CreateProductRequest,
   type ProductResponse,
   type UpdateProductRequest,
 } from '../lib/productsApi'
+import {
+  filesToDataUrls,
+  toCabinetCartItem,
+  toCabinetFavoriteItem,
+  toCabinetOrderItem,
+  type CabinetCartItem,
+  type CabinetFavoriteItem,
+  type CabinetOrderItem,
+} from './myProducts/cabinetMappers'
 
 const adCategories: string[] = [...marketplaceCategories]
 
 type CabinetSection = 'my-products' | 'favorites' | 'cart' | 'orders' | 'settings'
-
-type CabinetCartItem = {
-  id: string
-  title: string
-  unitPrice: number
-  quantity: number
-  stockQty: number
-  isOutOfStock: boolean
-  priceLabel: string
-  place: string
-  imageUrl: string | null
-}
-
-type CabinetFavoriteItem = {
-  id: string
-  title: string
-  priceLabel: string
-  place: string
-  imageUrl: string | null
-}
-
-type CabinetOrderItem = {
-  id: string
-  status: string
-  statusLabel: string
-  createdAtLabel: string
-  completedAtLabel: string | null
-  itemsCount: number
-  totalPriceLabel: string
-  lines: Array<{
-    lineId: string
-    productId: string
-    quantity: number
-    unitPriceLabel: string
-    lineTotalLabel: string
-    rating: number | null
-  }>
-}
-
-async function filesToDataUrls(files: File[]) {
-  const selected = files.slice(0, 6)
-  const items = await Promise.all(
-    selected.map(
-      (file) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(String(reader.result ?? ''))
-          reader.onerror = () => reject(new Error('Не удалось прочитать изображение.'))
-          reader.readAsDataURL(file)
-        }),
-    ),
-  )
-  return items.filter(Boolean)
-}
 
 export function MyProductsPage() {
   const navigate = useNavigate()
@@ -103,7 +59,7 @@ export function MyProductsPage() {
 
   function onLogout() {
     clearAuthSession()
-    window.location.href = '/'
+    navigate('/', { replace: true })
   }
 
   async function loadMyProducts() {
@@ -326,61 +282,10 @@ export function MyProductsPage() {
     setSearchParams({ section })
   }
 
-  function toCabinetCartItem(item: CartItemDto): CabinetCartItem {
-    const isOutOfStock = item.stockQty <= 0
-    return {
-      id: item.productId,
-      title: item.title,
-      unitPrice: item.price,
-      quantity: item.quantity,
-      stockQty: item.stockQty,
-      isOutOfStock,
-      priceLabel: `${item.price.toLocaleString('ru-RU')} ₽`,
-      place: extractLocation(item.description),
-      imageUrl: item.imageUrls?.[0] ?? null,
-    }
-  }
-
   function applyCartResponse(items: CartItemDto[]) {
     const mapped = items.map(toCabinetCartItem)
     setCabinetCartItems(mapped)
     setSelectedCartIds((prev) => prev.filter((id) => mapped.some((x) => x.id === id && !x.isOutOfStock)))
-  }
-
-  function toCabinetFavoriteItem(item: FavoriteItemDto): CabinetFavoriteItem {
-    return {
-      id: item.productId,
-      title: item.title,
-      priceLabel: `${item.price.toLocaleString('ru-RU')} ₽`,
-      place: extractLocation(item.description),
-      imageUrl: item.imageUrls?.[0] ?? null,
-    }
-  }
-
-  function toCabinetOrderItem(order: OrderDto): CabinetOrderItem {
-    const lines = order.items.map((x, index) => {
-      const lineTotal = x.unitPrice * x.quantity
-      const lineId = `${order.id}:${x.productId}:${index}`
-      return {
-        lineId,
-        productId: x.productId,
-        quantity: x.quantity,
-        unitPriceLabel: `${x.unitPrice.toLocaleString('ru-RU')} ₽`,
-        lineTotalLabel: `${lineTotal.toLocaleString('ru-RU')} ₽`,
-        rating: ratingByOrderLineId[lineId] ?? null,
-      }
-    })
-    const total = order.items.reduce((sum, x) => sum + x.unitPrice * x.quantity, 0)
-    return {
-      id: order.id,
-      status: order.status,
-      statusLabel: order.status === 'completed' ? 'Доставлен' : 'Оформлен',
-      createdAtLabel: new Date(order.createdAt).toLocaleString('ru-RU'),
-      completedAtLabel: order.completedAt ? new Date(order.completedAt).toLocaleString('ru-RU') : null,
-      itemsCount: order.items.reduce((sum, x) => sum + x.quantity, 0),
-      totalPriceLabel: `${total.toLocaleString('ru-RU')} ₽`,
-      lines,
-    }
   }
 
   async function loadOrders() {
@@ -391,7 +296,7 @@ export function MyProductsPage() {
       setError('error' in res ? res.error : 'Не удалось загрузить заказы')
       return
     }
-    setCabinetOrders(res.data.map(toCabinetOrderItem))
+    setCabinetOrders(res.data.map((order) => toCabinetOrderItem(order, ratingByOrderLineId)))
   }
 
   async function onCheckout() {
@@ -457,7 +362,7 @@ export function MyProductsPage() {
   )
   const selectedTotalLabel = useMemo(() => {
     const total = selectedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
-    return `${total.toLocaleString('ru-RU')} ₽`
+    return formatRub(total)
   }, [selectedItems])
 
   function toggleCartItemSelection(productId: string) {
@@ -492,14 +397,6 @@ export function MyProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSection, user?.userId])
 
-
-  function extractLocation(description?: string | null) {
-    if (!description) return 'Не указано'
-    const line = description
-      .split('\n')
-      .find((x) => x.trim().toLowerCase().startsWith('расположение:'))
-    return line ? line.replace(/расположение:\s*/i, '').trim() || 'Не указано' : 'Не указано'
-  }
 
   if (!isLoggedIn) {
     return (

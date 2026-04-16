@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { clearAuthSession, readCurrentUser } from '../lib/authSession'
 import { marketplaceCategories } from '../lib/categories'
 import { addFavorite, getMyFavorites, removeFavorite } from '../lib/favoritesApi'
+import { extractCategory, extractLocation } from '../lib/productDescription'
 import { productsApi, type ProductResponse } from '../lib/productsApi'
 
 type CategoryItem = {
@@ -21,19 +22,8 @@ type ProductItem = {
   category: string
 }
 
-function extractLocation(description?: string | null) {
-  if (!description) return 'Не указано'
-  const line = description
-    .split('\n')
-    .find((x) => x.trim().toLowerCase().startsWith('расположение:'))
-  return line ? line.replace(/расположение:\s*/i, '').trim() || 'Не указано' : 'Не указано'
-}
-
 function toHomeCard(item: ProductResponse): ProductItem {
-  const categoryLine = item.description
-    ?.split('\n')
-    .find((x) => x.trim().toLowerCase().startsWith('категория:'))
-  const category = categoryLine?.replace(/категория:\s*/i, '').trim() || 'Без категории'
+  const category = extractCategory(item.description) || 'Без категории'
 
   return {
     id: item.id,

@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { HelpPage } from './pages/HelpPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { MyProductsPage } from './pages/MyProductsPage'
@@ -23,7 +22,6 @@ export function App() {
     <>
       <Routes location={state?.backgroundLocation || location}>
         <Route path="/" element={<HomePage />} />
-        <Route path="/help" element={<HelpPage />} />
         <Route path="/products/:productId" element={<ProductPage />} />
         <Route path="/my-products" element={<MyProductsPage />} />
         <Route path="/profile" element={<ProfilePage />} />

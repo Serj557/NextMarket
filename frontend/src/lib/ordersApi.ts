@@ -1,25 +1,4 @@
-import { type ApiResult } from './api'
-
-const DEFAULT_BASE_URL = 'http://localhost:5158'
-
-function getBaseUrl() {
-  const envUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
-  return (envUrl && envUrl.trim()) || DEFAULT_BASE_URL
-}
-
-async function readErrorMessage(res: Response) {
-  try {
-    const contentType = res.headers.get('content-type') ?? ''
-    if (contentType.includes('application/json')) {
-      const json = (await res.json()) as { message?: string; error?: string }
-      return json.message || json.error || `HTTP ${res.status}`
-    }
-    const text = await res.text()
-    return text || `HTTP ${res.status}`
-  } catch {
-    return `HTTP ${res.status}`
-  }
-}
+import { getApiBaseUrl, readErrorMessage, type ApiResult } from './http'
 
 export type CreateOrderItemRequest = {
   productId: string
@@ -48,7 +27,7 @@ export type OrderDto = {
 
 export async function createOrder(payload: CreateOrderRequest): Promise<ApiResult<OrderDto>> {
   try {
-    const res = await fetch(`${getBaseUrl()}/api/orders`, {
+    const res = await fetch(`${getApiBaseUrl()}/api/orders`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
@@ -63,7 +42,7 @@ export async function createOrder(payload: CreateOrderRequest): Promise<ApiResul
 
 export async function getMyOrders(buyerId: string): Promise<ApiResult<OrderDto[]>> {
   try {
-    const res = await fetch(`${getBaseUrl()}/api/orders?buyerId=${encodeURIComponent(buyerId)}`)
+    const res = await fetch(`${getApiBaseUrl()}/api/orders?buyerId=${encodeURIComponent(buyerId)}`)
     if (!res.ok) return { ok: false, error: await readErrorMessage(res) }
     return { ok: true, data: (await res.json()) as OrderDto[] }
   } catch (e) {
@@ -74,7 +53,7 @@ export async function getMyOrders(buyerId: string): Promise<ApiResult<OrderDto[]
 
 export async function markOrderCompleted(orderId: string, buyerId: string): Promise<ApiResult<null>> {
   try {
-    const res = await fetch(`${getBaseUrl()}/api/orders/${encodeURIComponent(orderId)}/complete`, {
+    const res = await fetch(`${getApiBaseUrl()}/api/orders/${encodeURIComponent(orderId)}/complete`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ buyerId }),

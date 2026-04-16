@@ -1,0 +1,48 @@
+# ---- OS / Editor ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ---- Logs ----
+*.log
+
+# ---- .NET / ASP.NET ----
+bin/
+obj/
+
+*.dll
+*.exe
+*.pdb
+
+*.cache
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Rider/VS build outputs
+**/[Dd]ebug/
+**/[Rr]elease/
+
+# ---- Node / Vite / React ----
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# env files (keep .env.example)
+.env
+.env.*
+!.env.example
+
+# Vite cache
+.vite/
+
